@@ -1,3 +1,14 @@
 numpy
 pandas
+sklearn
+matplotlib
 gym
+stable_baselines
+optuna
+ta
+statsmodels==0.10.0rc2
+#empyrical
+ccxt
+psycopg2
+configparser
+quantstats>=0.0.17
