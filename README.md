@@ -11,5 +11,5 @@ Time frame: 15 minutes (230300 <=> 23:03:00)
   
 # Agent design  
 - action space: buy, sell, hold.  
-- observation space: open, close, high, low, agent's networth, usd held, eur held  in previous 60 time step  
-- Reward: networth(t) - networth(t-1)
+- observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
+- Reward: networth(t) - networth(t-1)  
