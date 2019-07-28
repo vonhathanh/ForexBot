@@ -19,5 +19,5 @@ model.learn(total_timesteps=50)
 obs = env.reset()
 for i in range(len(df['Time'])):
     action, _states = model.predict(obs)
-    obs, rewards, done, info = env.step(action)
+    obs, reward, done, info = env.step(action)
     env.render()

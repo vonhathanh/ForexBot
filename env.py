@@ -1,6 +1,7 @@
 import gym
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+from trading_graph import StockTradingGraph
 
 from gym import spaces
 
@@ -13,7 +14,7 @@ class TradingEnv(gym.Env):
     def __init__(self, df,
                  look_back_window_size=50,
                  commission=0.0003,
-                 initial_balance=1000*100,
+                 initial_balance=1000*1000,
                  serial=False):
 
         super(TradingEnv, self).__init__()
@@ -23,27 +24,29 @@ class TradingEnv(gym.Env):
         self.commission = commission
         self.serial = serial
         self.scaler = StandardScaler()
+        self.visualization = StockTradingGraph(
+            self.df, "Reward visualization")
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
         # action: buy, sell, hold <=> 0, 1, 2
         # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
         # => 3 actions available
         self.action_space = spaces.Discrete(3)
-        # observe the OHCL values, networth, and trade history (eur, usd held, actions)
-        # TODO: add time to observation space
+        # observe the OHCL values, networth, and trade history (eur held, usd held, actions)
+        # TODO: add time to observation space (do we really need time as a training feature?)
         self.observation_space = spaces.Box(low=0,
                                             high=1,
                                              shape=(8, look_back_window_size + 1),
                                             dtype=np.float16)
 
     def reset(self):
-        self.networth = self.initial_balance
+        self.net_worth = self.initial_balance
         self.eur_held = 0
         self.usd_held = self.initial_balance
 
         self.reset_session()
 
-        self.account_history = np.repeat([[self.networth], [0], [self.networth], [0]],
+        self.account_history = np.repeat([[self.net_worth], [0], [self.net_worth], [0]],
                                          self.look_back_window_size + 1,
                                          axis=1)
         self.trades = []
@@ -57,7 +60,7 @@ class TradingEnv(gym.Env):
             self.steps_left = len(self.df) - self.look_back_window_size - 1
             self.frame_start = self.look_back_window_size
         else:
-            self.steps_left = np.random.randint(500, self.MAX_TRADING_SESSION)
+            self.steps_left = np.random.randint(100, self.MAX_TRADING_SESSION)
             self.frame_start = np.random.randint(self.look_back_window_size, len(self.df) - self.steps_left)
 
         self.active_df = self.df[self.frame_start - self.look_back_window_size : self.frame_start + self.steps_left]
@@ -91,14 +94,16 @@ class TradingEnv(gym.Env):
             self.reset_session()
 
         obs = self.next_observation()
-        reward = self.networth - self.prev_networth
-        done = self.networth <= 0
+        reward = self.net_worth - self.prev_networth
+        done = self.net_worth <= 0
+
+        self.reward = reward
 
         return obs, reward, done, {}
 
     def take_action(self, action, current_price):
         amount = 0.5
-
+        # in forex, we buy with current price + comission (it's normaly 3 pip with eurusd pair)
         buy_price = current_price + self.commission
         sell_price = current_price
 
@@ -112,8 +117,9 @@ class TradingEnv(gym.Env):
         else:  # hold
             pass
 
-        self.prev_networth = self.networth
-        self.networth = self.usd_held + self.eur_held * sell_price
+        self.prev_networth = self.net_worth
+        # convert our networth to pure usd
+        self.net_worth = self.usd_held + (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
 
         if action == 1 or action == 2:
             self.trades.append({'step': self.frame_start + self.current_step,
@@ -121,14 +127,16 @@ class TradingEnv(gym.Env):
                                 'type': "buy" if action == 1 else "sell"})
 
         self.account_history = np.append(self.account_history, [
-            [self.networth],
+            [self.net_worth],
             [self.eur_held],
             [self.usd_held],
             [action],
         ], axis=1)
 
     def render(self, mode='human'):
-        print("current netwroth: ", self.networth)
+        if self.current_step > self.look_back_window_size:
+            self.visualization.render(
+                self.current_step, self.net_worth, self.reward, window_size=self.look_back_window_size)
 
 
 
