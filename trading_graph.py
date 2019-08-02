@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
 from matplotlib import style
+from datetime import datetime
 
 # finance module is no longer part of matplotlib
 # see: https://github.com/matplotlib/mpl_finance
@@ -32,7 +33,8 @@ class StockTradingGraph:
         self.df = df
         self.net_worths = np.zeros(len(df['DayOfYear']))
         self.rewards = np.zeros(len(df['DayOfYear']))
-
+        # Format dates as timestamps, necessary for candlestick graph
+        self.dates = self.df['DayOfYear'].values + ':' + self.df['Time'].values
         # Create a figure on screen and set the title
         fig = plt.figure()
         fig.suptitle(title)
@@ -49,8 +51,8 @@ class StockTradingGraph:
         #     (6, 1), (2, 0), rowspan=2, colspan=1, sharex=self.net_worth_ax)
 
         # Add padding to make graph easier to view
-        # plt.subplots_adjust(left=0.11, bottom=0.24,
-        #                     right=0.90, top=0.90, wspace=0.2, hspace=0)
+        plt.subplots_adjust(left=0.11, bottom=0.24,
+                            right=0.90, top=0.90, wspace=0.2, hspace=0)
 
         # Show the graph without blocking the rest of the program
         plt.show(block=False)
@@ -163,11 +165,52 @@ class StockTradingGraph:
                                        fontsize=8,
                                        arrowprops=(dict(color=color)))
 
-    def render_networth(self, net_worth, step_range, current_step):
-        pass
+    def render_networth(self, net_worth, dates, step_range, current_step):
+        self.net_worth_ax.clear()
 
-    def render_reward(self, reward, step_range, current_step):
-        pass
+        # Plot net worths
+        self.net_worth_ax.plot_date(
+            dates, self.net_worths[step_range], '-', label='Net Worth')
+
+        # Show legend, which uses the label we defined for the plot above
+        self.net_worth_ax.legend()
+        legend = self.net_worth_ax.legend(loc=2, ncol=2, prop={'size': 8})
+        legend.get_frame().set_alpha(0.4)
+
+        last_date = self.dates[current_step]
+        last_net_worth = self.net_worths[current_step]
+
+        # Annotate the current net worth on the net worth graph
+        self.net_worth_ax.annotate('{0:.2f}'.format(net_worth), (last_date, last_net_worth),
+                                   xytext=(last_date, last_net_worth),
+                                   bbox=dict(boxstyle='round',
+                                             fc='w', ec='k', lw=1),
+                                   color="black",
+                                   fontsize="small")
+
+    def render_reward(self, reward, dates, step_range, current_step):
+        # Clear the frame rendered last step
+        self.reward_ax.clear()
+
+        # Plot net worths
+        self.reward_ax.plot_date(
+            dates, self.rewards[step_range], '-', label='Reward')
+
+        # Show legend, which uses the label we defined for the plot above
+        self.reward_ax.legend()
+        legend = self.reward_ax.legend(loc=2, ncol=2, prop={'size': 8})
+        legend.get_frame().set_alpha(0.4)
+
+        last_date = self.dates[current_step]
+        last_reward = self.rewards[current_step]
+
+        # Annotate the current net worth on the net worth graph
+        self.reward_ax.annotate('{0:.2f}'.format(reward), (last_date, last_reward),
+                                xytext=(last_date, last_reward),
+                                bbox=dict(boxstyle='round',
+                                          fc='w', ec='k', lw=1),
+                                color="black",
+                                fontsize="small")
 
     def render(self, current_step, net_worth, reward, window_size=40):
         self.net_worths[current_step] = net_worth
@@ -175,11 +218,13 @@ class StockTradingGraph:
 
         window_start = max(current_step - window_size, 0)
         step_range = range(window_start, current_step + 1)
-        self.render_networth(net_worth, step_range, current_step)
-        self.render_reward(reward, step_range, current_step)
 
-        # # Format dates as timestamps, necessary for candlestick graph
-        # dates = self.df['DayOfYear'].apply(lambda x: pd.to_datetime(str(x), format='%Y%m%d')).values[step_range]
+        dates = self.dates[step_range]
+
+        self.render_networth(net_worth, dates, step_range, current_step)
+        self.render_reward(reward, dates, step_range, current_step)
+
+
         #
         # self._render_net_worth(current_step, net_worth, step_range, dates)
         # self._render_reward(current_step, reward, step_range, dates)
@@ -187,15 +232,17 @@ class StockTradingGraph:
         # # self._render_trades(current_step, trades, step_range)
         #
         # # Format the date ticks to be more easily read
-        # # self.price_ax.set_xticklabels(self.df['DayOfYear'].values[step_range], rotation=45,
-        # #                               horizontalalignment='right')
+        self.reward_ax.set_xticklabels(self.df['DayOfYear'].values[step_range], rotation=45,
+                                      horizontalalignment='right')
+
+        self.reward_ax.set_xticks(self.reward_ax.get_xticks()[::2])
+
         #
         # # Hide duplicate net worth date labels
-        # plt.setp(self.net_worth_ax.get_xticklabels(), visible=False)
+        plt.setp(self.net_worth_ax.get_xticklabels(), visible=False)
         #
-        # # Necessary to view frames before they are unrendered
+        # Necessary to view frames before they are unrendered
         plt.pause(0.001)
-        print("reward: ", reward)
 
     def close(self):
         plt.close()
