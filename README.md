@@ -17,7 +17,7 @@ Time frame: 1 minutes (230300 <=> 23:03:00)
   
 # TODO:  
 - Add more data (we are using data of year 2013 now) (done)  
-- Create train and test data set  
+- Create train and test data set (done)  
 - Implement test procedure on test data set  
 - Using news data as feature  
 - Display trade history  
