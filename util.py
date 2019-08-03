@@ -1,7 +1,8 @@
-from datetime import datetime
-
+import matplotlib.dates as mdates
 import pandas as pd
 import numpy as np
+
+
 
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
 
@@ -16,8 +17,9 @@ TIME_FRAME = {
     'w1': 60*24*7,
 }
 
-# utility function to help save the file in proper format
+
 def save_file(df, input_file, output_file=None):
+    # utility function to help save the file in proper format
     if output_file is not None:
         df.to_csv(output_file, float_format='%.4f')
     else:
@@ -36,8 +38,9 @@ def convert_txt_to_csv(input_file, output_file=None):
     save_file(df, input_file, output_file)
     print("Convert data to csv is done.")
 
-# convert the dataset to higher timeframe format, available options are: m5, m15, m30, h1, h4
+
 def reduce_to_time_frame(input_file, tf_type, output_file=None):
+    # convert the dataset to higher timeframe format, available options are: m5, m15, m30, h1, h4
     print("Start reduce time frame: to {}".format(tf_type))
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
@@ -53,8 +56,9 @@ def reduce_to_time_frame(input_file, tf_type, output_file=None):
     save_file(df, input_file, output_file)
     print("Convert data to {} is done.".format(tf_type))
 
-# format dayofyear field from int (20110103) to datetime format (2011-01-03)
+
 def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
+    # format dayofyear field from int (20110103) to datetime format (2011-01-03)
     print("Start reformat datetime field")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
@@ -75,8 +79,9 @@ def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
     save_file(df, input_file, output_file)
     print("reformat datetime field to is done.")
 
-# format time field from int (85200) to datetime format (08:05:00)
+
 def reformat_time(input_file, output_file=None):
+    # format time field from int (85200) to datetime format (08:05:00)
     print("Start reformat Time field")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
@@ -96,6 +101,11 @@ def reformat_time(input_file, output_file=None):
     print("time cost: ", time.time() - start)
     save_file(df, input_file, output_file)
     print("reformat Time field to is done.")
+
+
+def date2num(date):
+    converter = mdates.strpdate2num('%YYYY-%mm-%dd')
+    return converter(date)
 
 
 if __name__ == '__main__':

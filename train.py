@@ -20,4 +20,4 @@ obs = env.reset()
 for i in range(len(df['Time'])):
     action, _states = model.predict(obs)
     obs, reward, done, info = env.step(action)
-    env.render()
+    env.render(mode='human')

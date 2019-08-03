@@ -1,11 +1,9 @@
 import numpy as np
 import pandas as pd
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
+
 
 from matplotlib import style
-from datetime import datetime
 
 # finance module is no longer part of matplotlib
 # see: https://github.com/matplotlib/mpl_finance
@@ -19,11 +17,6 @@ UP_COLOR = '#27A59A'
 DOWN_COLOR = '#EF534F'
 UP_TEXT_COLOR = '#73D3CC'
 DOWN_TEXT_COLOR = '#DC2C27'
-
-
-def date2num(date):
-    converter = mdates.strpdate2num('%YYYY-%mm-%dd')
-    return converter(date)
 
 
 class StockTradingGraph:
@@ -55,7 +48,7 @@ class StockTradingGraph:
                             right=0.90, top=0.90, wspace=0.2, hspace=0)
 
         # Show the graph without blocking the rest of the program
-        plt.show(block=False)
+        self.showing = False
 
     def _render_net_worth(self, current_step, net_worth, step_range, dates):
         # Clear the frame rendered last step
@@ -168,7 +161,7 @@ class StockTradingGraph:
     def render_networth(self, net_worth, dates, step_range, current_step):
         self.net_worth_ax.clear()
 
-        # Plot net worths
+        # Plot net worth
         self.net_worth_ax.plot_date(
             dates, self.net_worths[step_range], '-', label='Net Worth')
 
@@ -213,6 +206,11 @@ class StockTradingGraph:
                                 fontsize="small")
 
     def render(self, current_step, net_worth, reward, window_size=40):
+        if not self.showing:
+            self.showing = True
+            plt.show(block=False)
+
+
         self.net_worths[current_step] = net_worth
         self.rewards[current_step] = reward
 
@@ -232,15 +230,19 @@ class StockTradingGraph:
         # # self._render_trades(current_step, trades, step_range)
         #
         # # Format the date ticks to be more easily read
-        self.reward_ax.set_xticklabels(self.df['DayOfYear'].values[step_range], rotation=45,
-                                      horizontalalignment='right')
+        # self.reward_ax.set_xticklabels(self.df['DayOfYear'].values[step_range], rotation=45,
+        #                               horizontalalignment='right')
 
-        self.reward_ax.set_xticks(self.reward_ax.get_xticks()[::2])
+        # self.reward_ax.set_xticks(self.reward_ax.get_xticks()[::2])
 
         #
         # # Hide duplicate net worth date labels
+        print("current date: ", dates[50])
         plt.setp(self.net_worth_ax.get_xticklabels(), visible=False)
-        #
+        plt.xticks(rotation=45)
+        plt.locator_params(axis='x', nbins=10)
+
+        # self.reward_ax.set_xticklabels(dates, rotation=45, horizontalalignment='right')
         # Necessary to view frames before they are unrendered
         plt.pause(0.001)
 

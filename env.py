@@ -107,13 +107,13 @@ class TradingEnv(gym.Env):
         buy_price = current_price + self.commission
         sell_price = current_price
 
-        if action == 1:  # buy
+        if action == 1:  # buy eur, sell usd => increase eur held, decrease usd held
             self.eur_held += amount * self.LOT_SIZE
-            self.usd_held -= self.eur_held * buy_price
+            self.usd_held -= amount * self.LOT_SIZE * buy_price
 
-        elif action == 2:  # sell
+        elif action == 2:  # sell eur => decrease eur held, increase usd held
             self.eur_held -= amount * self.LOT_SIZE
-            self.usd_held += self.eur_held * sell_price
+            self.usd_held += amount * self.LOT_SIZE * sell_price
         else:  # hold
             pass
 
@@ -134,9 +134,14 @@ class TradingEnv(gym.Env):
         ], axis=1)
 
     def render(self, mode='human'):
-        if self.current_step > self.look_back_window_size:
+        if self.current_step > self.look_back_window_size and mode == 'human':
             self.visualization.render(
                 self.current_step, self.net_worth, self.reward, window_size=self.look_back_window_size)
+        else:
+            # print("reward: ", self.reward)
+            # print("current price: ", self.get_current_price())
+            # print("net worth: ", self.net_worth)
+            print("current step: ", self.current_step)
 
 
 
