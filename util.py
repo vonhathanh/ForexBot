@@ -119,7 +119,7 @@ def split_dataset(input_file, split_ratio=0.8, train_file_name=None, test_file_n
     split_point = int(split_ratio * len(df))
 
     df_train = df[:split_point]
-    df_test = df[split_point:-1]
+    df_test = df[split_point:-1].reset_index(drop=True)
 
     if train_file_name is None:
         train_file_name = input_file[:-4] + "_train.csv"
@@ -131,12 +131,24 @@ def split_dataset(input_file, split_ratio=0.8, train_file_name=None, test_file_n
     print("split dataset complete!")
 
 
+def plot_data(input_file):
+    print("Start plotting our data set")
+    df = pd.read_csv(input_file,
+                     sep=',', index_col=0)
+    df['logged_and_diffed'] = np.log(df['Close']) - np.log(df['Close']).shift(1)
+
+    import matplotlib.pyplot as plt
+    plt.plot(df.index.values, df.logged_and_diffed.values)
+    plt.show()
+
+
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
     # reformat_date_of_year("./data/EURUSD_m15.csv")
     # reformat_time("./data/EURUSD_m15.csv")
-    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
+    # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
+    plot_data('./data/EURUSD_m15_test.csv')
     pass
 
 
