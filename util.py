@@ -33,6 +33,9 @@ def convert_txt_to_csv(input_file, output_file=None):
                      header=None,
                      names=["Ticker", "DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
 
+    # the 0 row is redundant so we remove it manually
+    df.drop(0, inplace=True)
+    # drop useless columns
     df.drop(["Ticker", "Vol"], axis=1, inplace=True)
 
     save_file(df, input_file, output_file)
@@ -108,12 +111,33 @@ def date2num(date):
     return converter(date)
 
 
+def split_dataset(input_file, split_ratio=0.8, train_file_name=None, test_file_name=None):
+    print("Start split dataset into train and test set")
+    df = pd.read_csv(input_file,
+                     sep=',', index_col=0)
+
+    split_point = int(split_ratio * len(df))
+
+    df_train = df[:split_point]
+    df_test = df[split_point:-1]
+
+    if train_file_name is None:
+        train_file_name = input_file[:-4] + "_train.csv"
+    if test_file_name is None:
+        test_file_name = input_file[:-4] + "_test.csv"
+
+    save_file(df_train, None, train_file_name)
+    save_file(df_test, None, test_file_name)
+    print("split dataset complete!")
+
+
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
     # reformat_date_of_year("./data/EURUSD_m15.csv")
-
-    reformat_time("./data/EURUSD_m15.csv")
+    # reformat_time("./data/EURUSD_m15.csv")
+    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
+    pass
 
 
 
