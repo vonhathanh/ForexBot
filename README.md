@@ -14,3 +14,14 @@ Time frame: 1 minutes (230300 <=> 23:03:00)
 - Action space: buy, sell, hold.  
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
+
+# TODO:
+- Add more data (we are using data of year 2013 now)
+- Create train and test data set
+- Implement test procedure
+- Using news data as feature
+- Display trade history
+- Saving training process to tensorboard for later evaluation
+- Make action space more diversity
+- Implement save model functionality
+- Improve performance
