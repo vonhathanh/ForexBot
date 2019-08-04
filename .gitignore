@@ -107,6 +107,9 @@ venv.bak/
 
 #unused files
 data/EURUSD.txt
+data/EURUSD.csv
+data/EURUSD_2012_2019_m1.zip
+data/data.zip
 data/Economic Calendar - Investing.com.html
 data/Economic Calendar - Investing.com_files/
 data/News events 2007-01-01 thru 2014-04-18.CSV

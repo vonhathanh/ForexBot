@@ -22,10 +22,10 @@ def save_file(df, input_file, output_file=None):
     # utility function to help save the file in proper format
     if output_file is not None:
         print("Saving output to: ", output_file)
-        df.to_csv(output_file, float_format='%.4f')
+        df.to_csv(output_file, float_format='%.5f')
     else:
         print("Saving output to: ", input_file)
-        df.to_csv(input_file, float_format='%.4f')
+        df.to_csv(input_file, float_format='%.5f')
 
 
 def convert_txt_to_csv(input_file, output_file=None):
@@ -52,11 +52,7 @@ def reduce_to_time_frame(input_file, tf_type, output_file=None):
 
     interval = TIME_FRAME[tf_type]
 
-    df.reset_index(inplace=True, drop=True)
-
-    times = df.Time.values.astype(int)
-    times = times // 100
-    times %= 100
+    times = df.Time.apply(lambda x: str(x)[-2:]).astype(int)
     indices = times % interval == 0
     df = df[indices]
 
@@ -179,18 +175,74 @@ def plot_metrics(metrics):
 
     plt.show()
 
+def merge_data_2012_2018():
+    data_2012 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2012.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2013 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2013.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2014 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2014.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2015 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2015.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2016 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2016.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2017 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2017.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2018 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2018.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+
+    data_2012_2018 = data_2012.append(data_2013)
+    data_2012_2018 = data_2012_2018.append(data_2014)
+    data_2012_2018 = data_2012_2018.append(data_2015)
+    data_2012_2018 = data_2012_2018.append(data_2016)
+    data_2012_2018 = data_2012_2018.append(data_2017)
+    data_2012_2018 = data_2012_2018.append(data_2018)
+
+    data_2012_2018.drop(["Vol"], axis=1, inplace=True)
+    data_2012_2018.reset_index(inplace=True, drop=True)
+
+    save_file(data_2012_2018, input_file="./data/EURUSD.csv")
+
+def merge_data_2019():
+    data_2019_01 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201901.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2019_02 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201902.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2019_03 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201903.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2019_04 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201904.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2019_05 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201905.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2019_06 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201906.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+    data_2019_07 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201907.csv',
+                            names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+
+    data_2019 = data_2019_01.append(data_2019_02)
+    data_2019 = data_2019.append(data_2019_03)
+    data_2019 = data_2019.append(data_2019_04)
+    data_2019 = data_2019.append(data_2019_05)
+    data_2019 = data_2019.append(data_2019_06)
+    data_2019 = data_2019.append(data_2019_07)
+
+    data_2019.drop(["Vol"], axis=1, inplace=True)
+    data_2019.reset_index(inplace=True, drop=True)
+
+    save_file(data_2019, input_file="./data/EURUSD_2019.csv")
 
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
-    reformat_date_of_year("./data/EURUSD_m15.csv")
-    reformat_time("./data/EURUSD_m15.csv")
-    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
+    # reformat_date_of_year("./data/EURUSD_m15.csv")
+    # reformat_time("./data/EURUSD_m15.csv")
+    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
     # plot_data('./data/EURUSD_m15_test.csv')
     # metrics = {"num_step": np.linspace(1, 10), "win_trades": np.linspace(1, 10), "lose_trades": np.linspace(1, 10), "avg_reward": np.linspace(1, 10), "most_profit_trade": np.linspace(1, 10),
     #                 "worst_trade": np.linspace(1, 10), "highest_networth": np.linspace(1, 10), "lowest_networth": np.linspace(1, 10)}
     #
     # plot_metrics(metrics)
+    # data_2011 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2011.csv', names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
     pass
 
 
