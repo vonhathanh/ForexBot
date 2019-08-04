@@ -3,6 +3,7 @@ import gym
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
+from util import plot_metrics
 
 from env import TradingEnv
 
@@ -20,7 +21,12 @@ model.learn(total_timesteps=1000)
 model.save("./models/mlp_model.model")
 
 obs = test_env.reset()
-for i in range(len(test_df['Time'])):
+for i in range(1000):
     action, _states = model.predict(obs)
     obs, reward, done, info = test_env.step(action)
-    test_env.render(mode='verbose')
+    test_env.render(mode='human')
+    if done:
+        test_env.reset()
+        print("oh yeah, trading done")
+
+plot_metrics(test_env.get_attr('metrics')[0])

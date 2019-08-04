@@ -1,11 +1,11 @@
 import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+
 import pandas as pd
 import numpy as np
 
 
-
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
-
 TIME_FRAME = {
     "m1": 1,
     "m5": 5,
@@ -137,8 +137,44 @@ def plot_data(input_file):
                      sep=',', index_col=0)
     df['logged_and_diffed'] = np.log(df['Close']) - np.log(df['Close']).shift(1)
 
-    import matplotlib.pyplot as plt
     plt.plot(df.index.values, df.logged_and_diffed.values)
+    plt.show()
+
+
+def plot_metrics(metrics):
+
+    ax1 = plt.subplot(2,3,1)
+    ax1.plot(metrics['num_step'], metrics['win_trades'], label='win trades')
+    ax1.plot(metrics['num_step'], metrics['lose_trades'], label='lose trades')
+    plt.legend(loc='upper left')
+    plt.xlabel("win vs lose trade")
+    ax1.xaxis.set_label_position('top')
+
+    ax2 = plt.subplot(2,3,2)
+    ax2.plot(metrics['num_step'], metrics['avg_reward'])
+    plt.xlabel("avg reward")
+    ax2.xaxis.set_label_position('top')
+
+    ax3 = plt.subplot(2, 3, 3)
+    ax3.plot(metrics['num_step'], metrics['most_profit_trade'])
+    plt.xlabel("most_profit_trade")
+    ax3.xaxis.set_label_position('top')
+
+    ax4 = plt.subplot(2, 3, 4)
+    ax4.plot(metrics['num_step'], metrics['worst_trade'])
+    plt.xlabel("worst_trade")
+    ax4.xaxis.set_label_position('top')
+
+    ax5 = plt.subplot(2, 3, 5)
+    ax5.plot(metrics['num_step'], metrics['highest_networth'])
+    plt.xlabel("highest_networth")
+    ax5.xaxis.set_label_position('top')
+
+    ax6 = plt.subplot(2, 3, 6)
+    ax6.plot(metrics['num_step'], metrics['lowest_networth'])
+    plt.xlabel("lowest_networth")
+    ax6.xaxis.set_label_position('top')
+
     plt.show()
 
 
@@ -148,7 +184,11 @@ if __name__ == '__main__':
     # reformat_date_of_year("./data/EURUSD_m15.csv")
     # reformat_time("./data/EURUSD_m15.csv")
     # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
-    plot_data('./data/EURUSD_m15_test.csv')
+    # plot_data('./data/EURUSD_m15_test.csv')
+    metrics = {"num_step": np.linspace(1, 10), "win_trades": np.linspace(1, 10), "lose_trades": np.linspace(1, 10), "avg_reward": np.linspace(1, 10), "most_profit_trade": np.linspace(1, 10),
+                    "worst_trade": np.linspace(1, 10), "highest_networth": np.linspace(1, 10), "lowest_networth": np.linspace(1, 10)}
+
+    plot_metrics(metrics)
     pass
 
 
