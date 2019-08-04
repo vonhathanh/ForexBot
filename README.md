@@ -17,7 +17,7 @@ Time frame: 1 minutes (230300 <=> 23:03:00)
 - Create train and test data set (done)  
 - Implement test procedure on test data set (almost done)  
 - Data visualization (done, nothing much to see)  
-- Create some tools to compare performance between models (almost done, just need to write data to tensorboard)  
+- Create some tools to compare performance between models (done)  
 - Improve model accuracy (better reward function, standardize data, more features as input to our data)  
 - Using news data as feature  
 - Display trade history   
