@@ -7,7 +7,7 @@
 Environment: python 3.6  
 Requirement: see requirements.txt  
 Data source: https://forextester.com/data/datasources  
-Time frame: 1 minutes (230300 <=> 23:03:00)
+Time frame: 1 minutes (230300 <=> 23:03:00)  
 # Agent design  
 - Action space: buy, sell, hold.  
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
@@ -17,13 +17,12 @@ Time frame: 1 minutes (230300 <=> 23:03:00)
 - Create train and test data set (done)  
 - Implement test procedure on test data set (almost done)  
 - Data visualization (done, nothing much to see)  
-- Create some tools to compare performance between models (amost done, jsut need to write data to tensorboard)  
+- Create some tools to compare performance between models (almost done, just need to write data to tensorboard)  
 - Improve model accuracy (better reward function, standardize data, more features as input to our data)  
 - Using news data as feature  
-- Display trade history  
-- Saving testing and training process to tensorboard for futher evaluation (almost done)  
+- Display trade history   
 - Make action space more diversity  
-- Implement save model functionality  
+- Implement save and restore model functionality  
 - Write unit test  
 # Notes:  
 - M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
