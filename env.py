@@ -1,8 +1,9 @@
 import gym
 import numpy as np
+import tensorflow as tf
+
 from sklearn.preprocessing import StandardScaler
 from trading_graph import StockTradingGraph
-
 from gym import spaces
 
 
@@ -14,7 +15,7 @@ class TradingEnv(gym.Env):
     def __init__(self, df,
                  look_back_window_size=50,
                  commission=0.0003,
-                 initial_balance=1000*1000,
+                 initial_balance=100*1000,
                  serial=False):
 
         super(TradingEnv, self).__init__()
@@ -33,8 +34,6 @@ class TradingEnv(gym.Env):
         self.commission = commission
         self.serial = serial
         self.scaler = StandardScaler()
-        self.visualization = StockTradingGraph(
-            self.df, "Reward visualization")
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
         # action: buy, sell, hold <=> 0, 1, 2
@@ -47,7 +46,10 @@ class TradingEnv(gym.Env):
                                             high=1,
                                              shape=(8, look_back_window_size + 1),
                                             dtype=np.float16)
+        self.init_metrics()
 
+
+    def init_metrics(self):
         # these properties are our metric for comparing different models
         self.win_trades = 0
         self.lose_trades = 0
@@ -57,34 +59,48 @@ class TradingEnv(gym.Env):
         self.worst_trade = 0
         self.highest_networth = self.initial_balance
         self.lowest_networth = self.initial_balance
+        # create metrics dict for plotting purpose
+        self.metrics = {"num_step": [],
+                        "win_trades": [],
+                        "lose_trades": [],
+                        "avg_reward": [],
+                        "most_profit_trade": [],
+                        "worst_trade": [],
+                        "highest_networth": [],
+                        "lowest_networth": []}
+
+
+    def get_metrics(self):
+        return self.metrics
 
     def reset(self):
-        self.net_worth = self.initial_balance
-        self.eur_held = 0
-        self.usd_held = self.initial_balance
-
+        # reset the environment and return fresh new state
         self.reset_session()
-
-        self.account_history = np.repeat([[self.net_worth], [0], [self.net_worth], [0]],
-                                         self.look_back_window_size + 1,
-                                         axis=1)
-        self.trades = []
-
         return self.next_observation()
 
     def reset_session(self):
+        # reset all variables that involve with the environment
         self.current_step = 0
+        self.net_worth = self.initial_balance
+        self.prev_networth = self.initial_balance
+        self.eur_held = 0
+        self.usd_held = self.initial_balance
+        self.trades = []
 
         if self.serial:
             self.steps_left = len(self.df) - self.look_back_window_size - 1
             self.frame_start = self.look_back_window_size
         else:
-            self.steps_left = np.random.randint(200, self.MAX_TRADING_SESSION)
+            self.steps_left = np.random.randint(500, self.MAX_TRADING_SESSION)
             self.frame_start = np.random.randint(self.look_back_window_size, len(self.df) - self.steps_left)
 
         self.active_df = self.df[self.frame_start - self.look_back_window_size : self.frame_start + self.steps_left]
+        self.account_history = np.repeat([[self.net_worth], [0], [self.net_worth], [0]],
+                                         self.look_back_window_size + 1,
+                                         axis=1)
 
     def next_observation(self):
+        # return the next observation of the environment
         end = self.current_step + self.look_back_window_size + 1
 
         obs = np.array([
@@ -101,31 +117,7 @@ class TradingEnv(gym.Env):
     def get_current_price(self):
         return self.active_df.iloc[self.current_step].Close
 
-    def step(self, action):
-        current_price = self.get_current_price()
-        self.take_action(action, current_price)
-        self.steps_left -= 1
-        self.current_step += 1
-
-        if self.steps_left == 0:
-            self.usd_held = 0
-            self.eur_held = 0
-            self.reset_session()
-
-        obs = self.next_observation()
-        reward = self.net_worth - self.prev_networth
-        done = self.net_worth <= 0
-
-        self.reward = reward
-
-        '''
-                We define some metrics to measure model's performance in test environment
-                - Number of win trades, lose trades
-                - Average reward
-                - Maximum networth achieved
-                - Minium networth achieved
-                - biggest win, lose trade
-                '''
+    def update_metrics(self):
         if self.net_worth <= self.prev_networth:
             self.lose_trades += 1
         else:
@@ -144,7 +136,23 @@ class TradingEnv(gym.Env):
         if profit < self.worst_trade:
             self.worst_trade = profit
 
-        return obs, reward, done, {}
+    def step(self, action):
+        current_price = self.get_current_price()
+        self.take_action(action, current_price)
+        self.steps_left -= 1
+        self.current_step += 1
+        self.reward = self.net_worth - self.prev_networth
+
+        obs = self.next_observation()
+        done = self.net_worth <= 0
+
+        self.update_metrics()
+
+        if self.steps_left == 1:
+            self.reset_session()
+            done = True
+
+        return obs, self.reward, done, {}
 
     def take_action(self, action, current_price):
         amount = 0.5
@@ -187,19 +195,31 @@ class TradingEnv(gym.Env):
 
 
     def render(self, mode='human'):
+        if not hasattr(self, 'visualization'):
+            self.visualization = StockTradingGraph(self.df, "Reward visualization")
+
         if self.current_step > self.look_back_window_size and mode == 'human':
             self.visualization.render(
                 self.current_step, self.net_worth, self.reward, window_size=self.look_back_window_size)
 
-        if self.current_step % 50 == 0:
-            print("{:<30s}{:>5.2f}".format("current step:", self.current_step))
-            print("{:<30s}{:>5.2f}".format("Total win trades:", self.win_trades))
-            print("{:<30s}{:>5.2f}".format("Total lose trades:", self.lose_trades))
-            print("{:<30s}{:>5.2f}".format("Avg reward:", self.avg_reward))
-            print("{:<30s}{:>5.2f}".format("Highest net worth:", self.highest_networth))
-            print("{:<30s}{:>5.2f}".format("Lowest net worth:", self.lowest_networth))
-            print("{:<30s}{:>5.2f}".format("Most profit trade win:", self.most_profit_trade))
-            print("{:<30s}{:>5.2f}".format("Worst trade lose:", self.worst_trade))
+        if self.num_step % 50 == 0:
+            self.metrics["num_step"].append(self.num_step)
+            self.metrics["win_trades"].append(self.win_trades)
+            self.metrics["lose_trades"].append(self.lose_trades)
+            self.metrics["avg_reward"].append(self.avg_reward)
+            self.metrics["most_profit_trade"].append(self.most_profit_trade)
+            self.metrics["worst_trade"].append(self.worst_trade)
+            self.metrics["highest_networth"].append(self.highest_networth)
+            self.metrics["lowest_networth"].append(self.lowest_networth)
+
+            print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
+            print("{:<25s}{:>5.2f}".format("Total win trades:", self.win_trades))
+            print("{:<25s}{:>5.2f}".format("Total lose trades:", self.lose_trades))
+            print("{:<25s}{:>5.2f}".format("Avg reward:", self.avg_reward))
+            print("{:<25s}{:>5.2f}".format("Highest net worth:", self.highest_networth))
+            print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.lowest_networth))
+            print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.most_profit_trade))
+            print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.worst_trade))
 
 
 
