@@ -45,66 +45,10 @@ class StockTradingGraph:
 
         # Add padding to make graph easier to view
         plt.subplots_adjust(left=0.11, bottom=0.24,
-                            right=0.90, top=0.90, wspace=0.2, hspace=0)
+                            right=0.90, top=0.90, wspace=0.2, hspace=0.2)
 
         # Show the graph without blocking the rest of the program
         self.showing = False
-
-    def _render_net_worth(self, current_step, net_worth, step_range, dates):
-        # Clear the frame rendered last step
-        self.net_worth_ax.clear()
-
-        # Plot net worths
-        self.net_worth_ax.plot_date(
-            dates, self.net_worths[step_range], '-', label='Net Worth')
-
-        # Show legend, which uses the label we defined for the plot above
-        self.net_worth_ax.legend()
-        legend = self.net_worth_ax.legend(loc=2, ncol=2, prop={'size': 8})
-        legend.get_frame().set_alpha(0.4)
-
-        last_date = pd.to_datetime(str(self.df["DayOfYear"][current_step]), format='%Y%m%d')
-        last_net_worth = self.net_worths[current_step]
-
-        # Annotate the current net worth on the net worth graph
-        self.net_worth_ax.annotate('{0:.2f}'.format(net_worth), (last_date, last_net_worth),
-                                   xytext=(last_date, last_net_worth),
-                                   bbox=dict(boxstyle='round',
-                                             fc='w', ec='k', lw=1),
-                                   color="black",
-                                   fontsize="small")
-
-        # Add space above and below min/max net worth
-        self.net_worth_ax.set_ylim(
-            min(self.net_worths[np.nonzero(self.net_worths)]) / 1.25, max(self.net_worths) * 1.25)
-
-    def _render_reward(self, current_step, reward, step_range, dates):
-        # Clear the frame rendered last step
-        self.reward_ax.clear()
-
-        # Plot net worths
-        self.reward_ax.plot_date(
-            dates, self.rewards[step_range], '-', label='Reward')
-
-        # Show legend, which uses the label we defined for the plot above
-        self.reward_ax.legend()
-        legend = self.reward_ax.legend(loc=2, ncol=2, prop={'size': 8})
-        legend.get_frame().set_alpha(0.4)
-
-        last_date = pd.to_datetime(str(self.df["DayOfYear"][current_step]), format='%Y%m%d')
-        last_reward = self.rewards[current_step]
-
-        # Annotate the current net worth on the net worth graph
-        self.reward_ax.annotate('{0:.2f}'.format(reward), (last_date, last_reward),
-                                   xytext=(last_date, last_reward),
-                                   bbox=dict(boxstyle='round',
-                                             fc='w', ec='k', lw=1),
-                                   color="black",
-                                   fontsize="small")
-
-        # Add space above and below min/max net worth
-        self.reward_ax.set_ylim(
-            min(self.rewards[np.nonzero(self.rewards)]) / 1.25, max(self.rewards) * 1.25)
 
     def _render_price(self, current_step, net_worth, step_range, dates):
         self.price_ax.clear()
@@ -222,27 +166,12 @@ class StockTradingGraph:
         self.render_networth(net_worth, dates, step_range, current_step)
         self.render_reward(reward, dates, step_range, current_step)
 
-
-        #
-        # self._render_net_worth(current_step, net_worth, step_range, dates)
-        # self._render_reward(current_step, reward, step_range, dates)
-        # # self._render_price(current_step, net_worth, dates, step_range)
-        # # self._render_trades(current_step, trades, step_range)
-        #
-        # # Format the date ticks to be more easily read
-        # self.reward_ax.set_xticklabels(self.df['DayOfYear'].values[step_range], rotation=45,
-        #                               horizontalalignment='right')
-
-        # self.reward_ax.set_xticks(self.reward_ax.get_xticks()[::2])
-
-        #
-        # # Hide duplicate net worth date labels
-        print("current date: ", dates[50])
+        # Hide duplicate net worth date labels
         plt.setp(self.net_worth_ax.get_xticklabels(), visible=False)
-        plt.xticks(rotation=45)
-        plt.locator_params(axis='x', nbins=10)
+        # rotate x axis by 45 degrees for better visual
+        plt.xticks(dates, rotation=45)
+        self.reward_ax.xaxis.set_major_locator(plt.MaxNLocator(10))
 
-        # self.reward_ax.set_xticklabels(dates, rotation=45, horizontalalignment='right')
         # Necessary to view frames before they are unrendered
         plt.pause(0.001)
 
