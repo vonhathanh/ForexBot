@@ -21,7 +21,7 @@ model.learn(total_timesteps=1000)
 model.save("./models/mlp_model.model")
 
 obs = test_env.reset()
-for i in range(1000):
+for i in range(len(test_df)):
     action, _states = model.predict(obs)
     obs, reward, done, info = test_env.step(action)
     test_env.render(mode='human')

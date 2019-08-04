@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 import pandas as pd
 import numpy as np
-
+import time
 
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
 TIME_FRAME = {
@@ -21,8 +21,10 @@ TIME_FRAME = {
 def save_file(df, input_file, output_file=None):
     # utility function to help save the file in proper format
     if output_file is not None:
+        print("Saving output to: ", output_file)
         df.to_csv(output_file, float_format='%.4f')
     else:
+        print("Saving output to: ", input_file)
         df.to_csv(input_file, float_format='%.4f')
 
 
@@ -48,13 +50,17 @@ def reduce_to_time_frame(input_file, tf_type, output_file=None):
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
 
-    df.reset_index(inplace=True, drop=True)
-
     interval = TIME_FRAME[tf_type]
 
-    indices = np.arange(0, len(df), interval).tolist()
+    df.reset_index(inplace=True, drop=True)
 
-    df = df.iloc[indices].reset_index(drop=True)
+    times = df.Time.values.astype(int)
+    times = times // 100
+    times %= 100
+    indices = times % interval == 0
+    df = df[indices]
+
+    df.reset_index(drop=True, inplace=True)
 
     save_file(df, input_file, output_file)
     print("Convert data to {} is done.".format(tf_type))
@@ -72,8 +78,6 @@ def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
         month = date % 100
         year = date // 100
         return str(year) + '-' + str(month) + '-' + str(day)
-
-    import time
 
     start = time.time()
     df['DayOfYear'] = pd.to_datetime(df['DayOfYear'].apply(lambda x: get_plit_date(x)), format=format)
@@ -94,8 +98,6 @@ def reformat_time(input_file, output_file=None):
         time = '0'*zero_to_fill + time
         time = time[:2] + ':' + time[2:]
         return time
-
-    import time
 
     start = time.time()
     df['Time'] = df['Time'].apply(lambda x: x // 100)
@@ -179,16 +181,16 @@ def plot_metrics(metrics):
 
 
 if __name__ == '__main__':
-    # convert_txt_to_csv("data/EURUSD.txt", "data/EURUSD.csv")
+    # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
-    # reformat_date_of_year("./data/EURUSD_m15.csv")
-    # reformat_time("./data/EURUSD_m15.csv")
-    # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
+    reformat_date_of_year("./data/EURUSD_m15.csv")
+    reformat_time("./data/EURUSD_m15.csv")
+    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.85)
     # plot_data('./data/EURUSD_m15_test.csv')
-    metrics = {"num_step": np.linspace(1, 10), "win_trades": np.linspace(1, 10), "lose_trades": np.linspace(1, 10), "avg_reward": np.linspace(1, 10), "most_profit_trade": np.linspace(1, 10),
-                    "worst_trade": np.linspace(1, 10), "highest_networth": np.linspace(1, 10), "lowest_networth": np.linspace(1, 10)}
-
-    plot_metrics(metrics)
+    # metrics = {"num_step": np.linspace(1, 10), "win_trades": np.linspace(1, 10), "lose_trades": np.linspace(1, 10), "avg_reward": np.linspace(1, 10), "most_profit_trade": np.linspace(1, 10),
+    #                 "worst_trade": np.linspace(1, 10), "highest_networth": np.linspace(1, 10), "lowest_networth": np.linspace(1, 10)}
+    #
+    # plot_metrics(metrics)
     pass
 
 
