@@ -23,7 +23,8 @@ news and then distribute it accordingly to current timeframe
 - Use custom model  
 - Implement weight initialization  
 - Make data stationary  
-- Create config parser
+- Create config parser  
+- Overfit one batch of dataset to test model ability  
 # Notes:  
 - M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
 # Dones
