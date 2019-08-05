@@ -19,10 +19,13 @@ Time frame: 1 minutes (230300 <=> 23:03:00)
 - Data visualization (done, nothing much to see)  
 - Create some tools to compare performance between models (done)  
 - Improve model accuracy (better reward function, standardize data, more features as input to our data)  
-- Using news data as feature  
+- Using news data as feature, we must calculate avg time the market is affected by 
+news and then distribute it accordingly to current timeframe  
 - Display trade history   
 - Make action space more diversity  
 - Implement save and restore model functionality  
 - Write unit test  
+- Use custom model
+- Implement weight initialization
 # Notes:  
 - M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
