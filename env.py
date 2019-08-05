@@ -40,11 +40,11 @@ class TradingEnv(gym.Env):
         # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
         # => 3 actions available
         self.action_space = spaces.Discrete(3)
-        # observe the OHCL values, networth, and trade history (eur held, usd held, actions)
+        # observe the OHCL values, networth, time, and trade history (eur held, usd held, actions)
         # TODO: consider add time to observation space
         self.observation_space = spaces.Box(low=0,
                                             high=1,
-                                             shape=(8, look_back_window_size + 1),
+                                             shape=(9, look_back_window_size + 1),
                                             dtype=np.float16)
         self.init_metrics()
 
@@ -104,6 +104,7 @@ class TradingEnv(gym.Env):
         end = self.current_step + self.look_back_window_size + 1
 
         obs = np.array([
+            self.active_df['NormalizedTime'].values[self.current_step: end],
             self.active_df['Open'].values[self.current_step: end],
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
@@ -220,6 +221,7 @@ class TradingEnv(gym.Env):
             print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.lowest_networth))
             print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.most_profit_trade))
             print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.worst_trade))
+            print("{:<25s}{:>5.2f}".format("Win ratio:", self.win_trades / (self.lose_trades + 1 + self.win_trades)))
 
 
 
