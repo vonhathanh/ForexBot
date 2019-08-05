@@ -14,17 +14,17 @@ test_df = pd.read_csv('./data/EURUSD_m15_test.csv', index_col=0)
 
 # The algorithms require a vectorized environment to run
 train_env = DummyVecEnv([lambda: TradingEnv(train_df)])
-test_env = DummyVecEnv([lambda: TradingEnv(test_df)])
+test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
 
 model = PPO2(MlpPolicy, train_env, verbose=1, tensorboard_log='./logs')
-model.learn(total_timesteps=1000)
+model.learn(total_timesteps=1000, seed=69)
 model.save("./models/mlp_model.model")
 
 obs = test_env.reset()
-for i in range(len(test_df)):
+for i in range(3000):
     action, _states = model.predict(obs)
     obs, reward, done, info = test_env.step(action)
-    test_env.render(mode='human')
+    test_env.render(mode='verbose')
     if done:
         test_env.reset()
         print("oh yeah, trading done")
