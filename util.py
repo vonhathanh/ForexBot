@@ -133,9 +133,22 @@ def plot_data(input_file):
     print("Start plotting our data set")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
-    df['logged_and_diffed'] = np.log(df['Close']) - np.log(df['Close']).shift(1)
 
-    plt.plot(df.index.values, df.logged_and_diffed.values)
+    df['logged_and_diffed'] = np.log(df['Close']) - np.log(df['Close']).shift(1)
+    df['z_norm'] = (df['Close'] - df['Close'].mean()) / df['Close'].std()
+
+    plt.subplot(3, 1, 1)
+    plt.plot(df.index.values, df.logged_and_diffed.values, label='logged_price')
+    plt.legend()
+
+    plt.subplot(3, 1, 2)
+    plt.plot(df.index.values, df.z_norm.values, label='znorm_price')
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    plt.plot(df.index.values, df.Close.values, label='normal_price')
+    plt.legend()
+
     plt.show()
 
 
@@ -231,18 +244,47 @@ def merge_data_2019():
 
     save_file(data_2019, input_file="./data/EURUSD_2019.csv")
 
+
+def encode_time(input_file, output_file=None):
+    print("Start encode time")
+    df = pd.read_csv(input_file,
+                     sep=',', index_col=0)
+
+    def encode(x):
+        hour = int(x[0:2])
+        minute = int(x[3:5])
+        current_time = hour * 60 + minute
+        encoded_time = current_time / (24 * 60)
+        return encoded_time
+
+    df['NormalizedTime'] = df['Time'].apply(lambda x: encode(x))
+    save_file(df, input_file, output_file)
+    print("encode time complete!")
+
+def standardize_data(df):
+    pass
+
+
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
     # reformat_date_of_year("./data/EURUSD_m15.csv")
     # reformat_time("./data/EURUSD_m15.csv")
-    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
-    # plot_data('./data/EURUSD_m15_test.csv')
-    # metrics = {"num_step": np.linspace(1, 10), "win_trades": np.linspace(1, 10), "lose_trades": np.linspace(1, 10), "avg_reward": np.linspace(1, 10), "most_profit_trade": np.linspace(1, 10),
-    #                 "worst_trade": np.linspace(1, 10), "highest_networth": np.linspace(1, 10), "lowest_networth": np.linspace(1, 10)}
+    plot_data('./data/EURUSD_m15_train.csv')
+    # metrics = {"num_step": np.linspace(1, 10),
+    #            "win_trades": np.linspace(1, 10),
+    #            "lose_trades": np.linspace(1, 10),
+    #            "avg_reward": np.linspace(1, 10),
+    #            "most_profit_trade": np.linspace(1, 10),
+    #            "worst_trade": np.linspace(1, 10),
+    #            "highest_networth": np.linspace(1, 10),
+    #            "lowest_networth": np.linspace(1, 10)}
     #
     # plot_metrics(metrics)
-    # data_2011 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2011.csv', names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
+
+    # encode_time("./data/EURUSD_m15.csv")
+    # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
+
     pass
 
 
