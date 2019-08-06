@@ -22,14 +22,17 @@ news and then distribute it accordingly to current timeframe
 - Write unit test  
 - Use custom model  
 - Implement weight initialization  
-- Make data stationary  
 - Create config parser  
 - Overfit one batch of dataset to test model ability  
+- Use convnet to test on non-stationary data  
 # Notes:  
+- Setup end-to-end training/evalution skeleton first + get dump baselines.  
+- Fix random seed, start simple first, don't add too many features to our model
+- Complexity only one at a time (plug signal in one by one)
 - M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
 # Dones
-- Add more data (we are using data of year 2013 now) (done)  
-- Create train and test data set (done)  
-- Implement test procedure on test data set (almost done)  
-- Data visualization (done, nothing much to see)  
-- Create some tools to compare performance between models (done) 
+- Add more data (we are using data of year 2013 now)  
+- Create train and test data set  
+- Implement test procedure on test data set   
+- Data visualization    
+- Create some tools to compare performance between models  

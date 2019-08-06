@@ -16,7 +16,8 @@ class TradingEnv(gym.Env):
                  look_back_window_size=50,
                  commission=0.0003,
                  initial_balance=100*1000,
-                 serial=False):
+                 serial=False,
+                 random=False):
 
         super(TradingEnv, self).__init__()
         self.df = df.dropna().reset_index()
@@ -28,6 +29,7 @@ class TradingEnv(gym.Env):
         self.trades = []
         self.current_step = 0
         self.reward = 0
+        self.random = random
         self.account_history = np.repeat([[self.net_worth], [0], [self.net_worth], [0]],
                                          self.look_back_window_size + 1,
                                          axis=1)
@@ -44,9 +46,10 @@ class TradingEnv(gym.Env):
         # TODO: consider add time to observation space
         self.observation_space = spaces.Box(low=0,
                                             high=1,
-                                             shape=(9, look_back_window_size + 1),
+                                             shape=(8, look_back_window_size + 1),
                                             dtype=np.float16)
         self.init_metrics()
+        np.random.seed(69)
 
 
     def init_metrics(self):
@@ -104,7 +107,7 @@ class TradingEnv(gym.Env):
         end = self.current_step + self.look_back_window_size + 1
 
         obs = np.array([
-            self.active_df['NormalizedTime'].values[self.current_step: end],
+            # self.active_df['NormalizedTime'].values[self.current_step: end],
             self.active_df['Open'].values[self.current_step: end],
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
@@ -139,6 +142,8 @@ class TradingEnv(gym.Env):
 
     def step(self, action):
         current_price = self.get_current_price()
+        if self.random:
+            action = np.random.randint(3)
         self.take_action(action, current_price)
         self.steps_left -= 1
         self.current_step += 1

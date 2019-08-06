@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 import time
 
+from datetime import datetime
+
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
 TIME_FRAME = {
     "m1": 1,
@@ -187,6 +189,22 @@ def plot_metrics(metrics):
     ax6.xaxis.set_label_position('top')
 
     plt.show()
+
+    with open("./logs/metrics.txt", 'a+') as f:
+        now = datetime.now()
+        date = now.strftime("%Y-%m-%d, %H:%M:%S")
+        f.write(date + "\n")
+        f.write("{:<25s}{:>5.2f}\n".format("Num step:", metrics['num_step'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Total win trades:", metrics['win_trades'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Total lose trades:", metrics['lose_trades'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metrics['avg_reward'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Highest net worth:", metrics['highest_networth'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Lowest net worth:", metrics['lowest_networth'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Most profit trade win:", metrics['most_profit_trade'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Worst trade lose:", metrics['worst_trade'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Win ratio:", metrics['win_trades'][-1] / (metrics['win_trades'][-1] + 1 + metrics['lose_trades'][-1])))
+        f.write("-" * 80 + "\n")
+
 
 def merge_data_2012_2018():
     data_2012 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2012.csv',
