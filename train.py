@@ -47,13 +47,13 @@ if __name__ == '__main__':
     train_df = pd.read_csv('./data/EURUSD_m15_train.csv', index_col=0)
     test_df = pd.read_csv('./data/EURUSD_m15_test.csv', index_col=0)
     # The algorithms require a vectorized environment to run
-    train_env = DummyVecEnv([lambda: LSTM_Env(train_df)])
-    test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial=True)])
+    train_env = DummyVecEnv([lambda: TradingEnv(train_df)])
+    test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
 
     if args.mode == "train":
         print("Training started")
-        model = PPO2(MlpLstmPolicy, train_env, verbose=1, tensorboard_log='./logs', nminibatches=1)
-        model.learn(total_timesteps=300000, seed=69)
+        model = PPO2(MlpPolicy, train_env, verbose=1, tensorboard_log='./logs', nminibatches=1)
+        model.learn(total_timesteps=10000, seed=69)
         model.save("./models/mlp_model")
         print("Training's done, saved model to ./models/mlp_model")
     else:
@@ -61,11 +61,13 @@ if __name__ == '__main__':
         print("Loading model at: ./models/mlp_model")
         model = PPO2.load("./models/mlp_model.pkl")
 
-        print("Start testing on test set")
-        evaluate_test_set(model, test_env)
+        print("Start testing on train set")
+        evaluate_train_set(model, train_env)
+
 
         if args.test_mode == 'double':
-            evaluate_train_set(model, train_env)
+            print("Start testing on test set")
+            evaluate_test_set(model, test_env)
 
         print("Testing's comeplete")
 

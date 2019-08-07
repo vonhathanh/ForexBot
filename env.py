@@ -30,12 +30,8 @@ class TradingEnv(gym.Env):
         self.current_step = 0
         self.reward = 0
         self.random = random
-        self.account_history = np.repeat([[self.net_worth], [0], [self.net_worth], [0]],
-                                         self.look_back_window_size + 1,
-                                         axis=1)
         self.commission = commission
         self.serial = serial
-        self.scaler = StandardScaler()
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
         # action: buy, sell, hold <=> 0, 1, 2
@@ -43,10 +39,9 @@ class TradingEnv(gym.Env):
         # => 3 actions available
         self.action_space = spaces.Discrete(3)
         # observe the OHCL values, networth, time, and trade history (eur held, usd held, actions)
-        # TODO: consider add time to observation space
-        self.observation_space = spaces.Box(low=0,
-                                            high=3,
-                                             shape=(8, look_back_window_size + 1),
+        self.observation_space = spaces.Box(low=-10,
+                                            high=10,
+                                             shape=(4, look_back_window_size + 1),
                                             dtype=np.float16)
         self.init_metrics()
         np.random.seed(69)
@@ -97,9 +92,6 @@ class TradingEnv(gym.Env):
             self.frame_start = np.random.randint(self.look_back_window_size, len(self.df) - self.steps_left)
 
         self.active_df = self.df[self.frame_start - self.look_back_window_size : self.frame_start + self.steps_left]
-        self.account_history = np.repeat([[self.net_worth], [0], [self.net_worth], [0]],
-                                         self.look_back_window_size + 1,
-                                         axis=1)
 
     def next_observation(self):
         # return the next observation of the environment
@@ -110,11 +102,9 @@ class TradingEnv(gym.Env):
             self.active_df['Open'].values[self.current_step: end],
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
-            self.active_df['Normed_Close'].values[self.current_step: end],
+            self.active_df['NormedClose'].values[self.current_step: end],
         ])
 
-        scaled_history = self.scaler.fit_transform(self.account_history)
-        obs = np.append(obs, scaled_history[:, -(self.look_back_window_size + 1) :], axis=0)
         return obs
 
     def get_current_price(self):
@@ -194,13 +184,6 @@ class TradingEnv(gym.Env):
                                 'amount': amount,
                                 'type': "buy" if action == 1 else "sell"})
 
-        self.account_history = np.append(self.account_history, [
-            [self.net_worth],
-            [self.eur_held],
-            [self.usd_held],
-            [action],
-        ], axis=1)
-
     def render(self, mode='human'):
         if not hasattr(self, 'visualization'):
             self.visualization = StockTradingGraph(self.df, "Reward visualization")
@@ -242,7 +225,6 @@ class LSTM_Env(TradingEnv):
                  serial,
                  random)
 
-        self.account_history = np.array([self.net_worth, 0, self.net_worth, 0])
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
                                              shape=(4, ),
@@ -250,7 +232,6 @@ class LSTM_Env(TradingEnv):
 
     def reset_session(self):
         super().reset_session()
-        self.account_history = np.array([self.net_worth, 0, self.net_worth, 0])
 
     def next_observation(self):
         obs = np.array([
@@ -258,7 +239,7 @@ class LSTM_Env(TradingEnv):
             self.active_df['Open'].values[self.current_step],
             self.active_df['High'].values[self.current_step],
             self.active_df['Low'].values[self.current_step],
-            self.active_df['Normed_Close'].values[self.current_step],
+            self.active_df['NormedClose'].values[self.current_step],
         ])
 
         return obs

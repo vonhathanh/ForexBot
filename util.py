@@ -1,6 +1,5 @@
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-
 import pandas as pd
 import numpy as np
 import time
@@ -183,7 +182,6 @@ def plot_metrics(metrics):
     plt.xlabel("networth")
     ax5.xaxis.set_label_position('top')
 
-
     plt.show()
 
     with open("./logs/metrics.txt", 'a+') as f:
@@ -274,7 +272,7 @@ def encode_time(input_file, output_file=None):
     print("encode time complete!")
 
 def standardize_data(df):
-    df["Normed_Close"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
+    df["NormedClose"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
     df["Open"] = (np.log(df['Open']) - np.log(df['Open']).shift(1)) * 100
     df["High"] = (np.log(df['High']) - np.log(df['High']).shift(1)) * 100
     df["Low"] = (np.log(df['Low']) - np.log(df['Low']).shift(1)) * 100
