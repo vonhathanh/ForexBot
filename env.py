@@ -5,6 +5,7 @@ import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
 from trading_graph import StockTradingGraph
 from gym import spaces
+from util import standardize_data
 
 
 class TradingEnv(gym.Env):
@@ -20,7 +21,7 @@ class TradingEnv(gym.Env):
                  random=False):
 
         super(TradingEnv, self).__init__()
-        self.df = df.dropna().reset_index()
+        self.df = standardize_data(df).dropna().reset_index(drop=True)
         self.look_back_window_size = look_back_window_size
         self.initial_balance = initial_balance
         self.net_worth = self.initial_balance
@@ -45,7 +46,7 @@ class TradingEnv(gym.Env):
         # observe the OHCL values, networth, time, and trade history (eur held, usd held, actions)
         # TODO: consider add time to observation space
         self.observation_space = spaces.Box(low=0,
-                                            high=1,
+                                            high=3,
                                              shape=(8, look_back_window_size + 1),
                                             dtype=np.float16)
         self.init_metrics()
@@ -69,8 +70,7 @@ class TradingEnv(gym.Env):
                         "avg_reward": [],
                         "most_profit_trade": [],
                         "worst_trade": [],
-                        "highest_networth": [],
-                        "lowest_networth": []}
+                        "net_worth": []}
 
 
     def get_metrics(self):
@@ -111,7 +111,7 @@ class TradingEnv(gym.Env):
             self.active_df['Open'].values[self.current_step: end],
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
-            self.active_df['Close'].values[self.current_step: end],
+            self.active_df['Normed_Close'].values[self.current_step: end],
         ])
 
         scaled_history = self.scaler.fit_transform(self.account_history)
@@ -215,8 +215,7 @@ class TradingEnv(gym.Env):
             self.metrics["avg_reward"].append(self.avg_reward)
             self.metrics["most_profit_trade"].append(self.most_profit_trade)
             self.metrics["worst_trade"].append(self.worst_trade)
-            self.metrics["highest_networth"].append(self.highest_networth)
-            self.metrics["lowest_networth"].append(self.lowest_networth)
+            self.metrics["net_worth"].append(self.net_worth)
 
             print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
             print("{:<25s}{:>5.2f}".format("Total win trades:", self.win_trades))

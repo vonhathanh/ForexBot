@@ -179,14 +179,10 @@ def plot_metrics(metrics):
     ax4.xaxis.set_label_position('top')
 
     ax5 = plt.subplot(2, 3, 5)
-    ax5.plot(metrics['num_step'], metrics['highest_networth'])
-    plt.xlabel("highest_networth")
+    ax5.plot(metrics['num_step'], metrics['net_worth'])
+    plt.xlabel("networth")
     ax5.xaxis.set_label_position('top')
 
-    ax6 = plt.subplot(2, 3, 6)
-    ax6.plot(metrics['num_step'], metrics['lowest_networth'])
-    plt.xlabel("lowest_networth")
-    ax6.xaxis.set_label_position('top')
 
     plt.show()
 
@@ -198,8 +194,6 @@ def plot_metrics(metrics):
         f.write("{:<25s}{:>5.2f}\n".format("Total win trades:", metrics['win_trades'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Total lose trades:", metrics['lose_trades'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metrics['avg_reward'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Highest net worth:", metrics['highest_networth'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Lowest net worth:", metrics['lowest_networth'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Most profit trade win:", metrics['most_profit_trade'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Worst trade lose:", metrics['worst_trade'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Win ratio:", metrics['win_trades'][-1] / (metrics['win_trades'][-1] + 1 + metrics['lose_trades'][-1])))
@@ -280,7 +274,11 @@ def encode_time(input_file, output_file=None):
     print("encode time complete!")
 
 def standardize_data(df):
-    pass
+    df["Normed_Close"] = np.log(df['Close']) - np.log(df['Close']).shift(1)
+    df["Open"] = np.log(df['Open']) - np.log(df['Open']).shift(1)
+    df["High"] = np.log(df['High']) - np.log(df['High']).shift(1)
+    df["Low"] = np.log(df['Low']) - np.log(df['Low']).shift(1)
+    return df
 
 
 if __name__ == '__main__':

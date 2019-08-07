@@ -113,5 +113,5 @@ data/data.zip
 data/Economic Calendar - Investing.com.html
 data/Economic Calendar - Investing.com_files/
 data/News events 2007-01-01 thru 2014-04-18.CSV
-models/*.model
+models/*.pkl
 logs/
