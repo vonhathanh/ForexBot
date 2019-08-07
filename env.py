@@ -1,6 +1,5 @@
 import gym
 import numpy as np
-import tensorflow as tf
 
 from sklearn.preprocessing import StandardScaler
 from trading_graph import StockTradingGraph
@@ -147,7 +146,10 @@ class TradingEnv(gym.Env):
         self.take_action(action, current_price)
         self.steps_left -= 1
         self.current_step += 1
-        self.reward = self.net_worth - self.prev_networth
+        profit = self.net_worth - self.prev_networth
+
+        if profit == 0: profit += 1
+        self.reward = np.log(abs(profit)) if profit > 0 else -np.log(abs(profit))
 
         obs = self.next_observation()
         done = self.net_worth <= 0
@@ -199,7 +201,6 @@ class TradingEnv(gym.Env):
             [action],
         ], axis=1)
 
-
     def render(self, mode='human'):
         if not hasattr(self, 'visualization'):
             self.visualization = StockTradingGraph(self.df, "Reward visualization")
@@ -228,8 +229,69 @@ class TradingEnv(gym.Env):
             print("{:<25s}{:>5.2f}".format("Win ratio:", self.win_trades / (self.lose_trades + 1 + self.win_trades)))
 
 
+class LSTM_Env(TradingEnv):
 
+    def __init__(self, df, look_back_window_size=50,
+                 commission=0.0003,
+                 initial_balance=100*1000,
+                 serial=False,
+                 random=False):
+        super().__init__(df, look_back_window_size,
+                 commission,
+                 initial_balance,
+                 serial,
+                 random)
 
+        self.account_history = np.array([self.net_worth, 0, self.net_worth, 0])
+        self.observation_space = spaces.Box(low=-10,
+                                            high=10,
+                                             shape=(4, ),
+                                            dtype=np.float16)
 
+    def reset_session(self):
+        super().reset_session()
+        self.account_history = np.array([self.net_worth, 0, self.net_worth, 0])
 
+    def next_observation(self):
+        obs = np.array([
+            # self.active_df['NormalizedTime'].values[self.current_step: end],
+            self.active_df['Open'].values[self.current_step],
+            self.active_df['High'].values[self.current_step],
+            self.active_df['Low'].values[self.current_step],
+            self.active_df['Normed_Close'].values[self.current_step],
+        ])
 
+        return obs
+
+    def take_action(self, action, current_price):
+        amount = 0.5
+        # in forex, we buy with current price + comission (it's normaly 3 pip with eurusd pair)
+        buy_price = current_price + self.commission
+        sell_price = current_price
+
+        '''assume we have 100,000 usd and 0 eur
+        assume current price is 1.5 (1 eur = 1.5 usd)
+        assume comission = 3 pip = 0.0003
+        => true buy price = 1.5003, sell price = 1.5
+        buy 0.5 lot eur => we have 50,000 eur and (100,000 - 50,000 * 1.5003) = 24985 usd
+        => out networth: 50,000 * 1.5 + 24985 = 99985 (we lose 3 pip, 1 pip = 5 usd, 
+        we are using 0.5 lot as defaut, if we buy 1 lot => 1 pip = 10 usd, correct!!! )'''
+        if action == 1:  # buy eur, sell usd => increase eur held, decrease usd held
+            self.eur_held += amount * self.LOT_SIZE
+            self.usd_held -= amount * self.LOT_SIZE * buy_price
+
+        elif action == 2:  # sell eur => decrease eur held, increase usd held
+            self.eur_held -= amount * self.LOT_SIZE
+            self.usd_held += amount * self.LOT_SIZE * sell_price
+        else:  # hold
+            pass
+
+        self.prev_networth = self.net_worth
+        # convert our networth to pure usd
+        self.net_worth = self.usd_held + (
+            self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+
+        if action == 1 or action == 2:
+            self.trades.append({'step': self.frame_start + self.current_step,
+                                'amount': amount,
+                                'type': "buy" if action == 1 else "sell"})
