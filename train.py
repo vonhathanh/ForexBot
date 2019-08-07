@@ -1,12 +1,11 @@
 import argparse
 import pandas as pd
-import gym
 
-from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
 from util import plot_metrics
-from env import TradingEnv
+from env import TradingEnv, LSTM_Env
 
 
 def evaluate_test_set(model, test_env):
@@ -48,12 +47,12 @@ if __name__ == '__main__':
     train_df = pd.read_csv('./data/EURUSD_m15_train.csv', index_col=0)
     test_df = pd.read_csv('./data/EURUSD_m15_test.csv', index_col=0)
     # The algorithms require a vectorized environment to run
-    train_env = DummyVecEnv([lambda: TradingEnv(train_df[:1000], serial=True)])
-    test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
+    train_env = DummyVecEnv([lambda: LSTM_Env(train_df)])
+    test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial=True)])
 
     if args.mode == "train":
         print("Training started")
-        model = PPO2(MlpPolicy, train_env, verbose=1, tensorboard_log='./logs')
+        model = PPO2(MlpLstmPolicy, train_env, verbose=1, tensorboard_log='./logs', nminibatches=1)
         model.learn(total_timesteps=300000, seed=69)
         model.save("./models/mlp_model")
         print("Training's done, saved model to ./models/mlp_model")
