@@ -136,7 +136,7 @@ def plot_data(input_file):
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
 
-    df['logged_and_diffed'] = np.log(df['Close']) - np.log(df['Close']).shift(1)
+    df['logged_and_diffed'] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
     df['z_norm'] = (df['Close'] - df['Close'].mean()) / df['Close'].std()
 
     plt.subplot(3, 1, 1)
@@ -274,10 +274,10 @@ def encode_time(input_file, output_file=None):
     print("encode time complete!")
 
 def standardize_data(df):
-    df["Normed_Close"] = np.log(df['Close']) - np.log(df['Close']).shift(1)
-    df["Open"] = np.log(df['Open']) - np.log(df['Open']).shift(1)
-    df["High"] = np.log(df['High']) - np.log(df['High']).shift(1)
-    df["Low"] = np.log(df['Low']) - np.log(df['Low']).shift(1)
+    df["Normed_Close"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
+    df["Open"] = (np.log(df['Open']) - np.log(df['Open']).shift(1)) * 100
+    df["High"] = (np.log(df['High']) - np.log(df['High']).shift(1)) * 100
+    df["Low"] = (np.log(df['Low']) - np.log(df['Low']).shift(1)) * 100
     return df
 
 
