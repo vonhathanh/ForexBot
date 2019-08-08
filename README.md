@@ -18,21 +18,33 @@ Time frame: 1 minutes (230300 <=> 23:03:00)
 news and then distribute it accordingly to current timeframe  
 - Display trade history   
 - Make action space more diversity  
-- Implement save and restore model functionality  
 - Write unit test  
 - Use custom model  
 - Implement weight initialization  
-- Create config parser  
-- Overfit one batch of dataset to test model ability  
-- Use convnet to test on non-stationary data  
-# Notes:  
-- Setup end-to-end training/evalution skeleton first + get dump baselines.  
-- Fix random seed, start simple first, don't add too many features to our model
-- Complexity only one at a time (plug signal in one by one)
-- M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
+- Use convnet to test on non-stationary data (this can't be done right now because stable baseline convnet only accept image input)  
 # Dones
 - Add more data (we are using data of year 2013 now)  
 - Create train and test data set  
 - Implement test procedure on test data set   
 - Data visualization    
 - Create some tools to compare performance between models  
+- Create config parser  
+- Overfit one batch of dataset to test model ability  
+- Implement save and restore model functionality  
+# Notes:  
+- Setup end-to-end training/evalution skeleton first + get dump baselines.  
+- Fix random seed, start simple first, don't add too many features to our model
+- Complexity only one at a time (plug signal in one by one)
+- M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
+- Right now we have reduced the spread to 0.1, in reality the spread will be 0.3 or higher,  
+we need to test it against higher spread  
+# Conclusions and thoughts:
+- We can overfit mlp policy after 1m steps of training with data in a very short duration (300x15 minutes)  
+- Eventhough we did overfit the model and it did increase our net worth overtime, but the win ratio is still 50%,  
+we may need to investigate later, because our goal is win rate >= 80%  
+- Win rate is not everything in Fx trading but we still need it higher 50% for more security.
+- Althought our model is overfitted is still perform prety well on test set: x6 networth in about 6000 steps,  
+It also go bankrupt in 1-2000 steps later on which is the result that we expected.  
+- Our objective is now increase the avg win value per trade and win ratio as well as reduce the avg lose per trade  
+=> First conclusion: more data is not really good for model if we don't understand and arrange the data correctly, 
+on the other hand, more training is really important in RL  
