@@ -23,7 +23,7 @@ def evaluate_test_set(model, test_env):
 def evaluate_train_set(model, train_env):
     print("Start testing on train set (for overfitting check")
     obs = train_env.reset()
-    for i in range(1000):
+    for i in range(6000):
         action, _states = model.predict(obs)
         obs, reward, done, info = train_env.step(action)
         train_env.render(mode='verbose')
@@ -47,13 +47,13 @@ if __name__ == '__main__':
     train_df = pd.read_csv('./data/EURUSD_m15_train.csv', index_col=0)
     test_df = pd.read_csv('./data/EURUSD_m15_test.csv', index_col=0)
     # The algorithms require a vectorized environment to run
-    train_env = DummyVecEnv([lambda: TradingEnv(train_df)])
+    train_env = DummyVecEnv([lambda: TradingEnv(train_df, serial=True)])
     test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
 
     if args.mode == "train":
         print("Training started")
         model = PPO2(MlpPolicy, train_env, verbose=1, tensorboard_log='./logs', nminibatches=1)
-        model.learn(total_timesteps=10000, seed=69)
+        model.learn(total_timesteps=1000000, seed=69)
         model.save("./models/mlp_model")
         print("Training's done, saved model to ./models/mlp_model")
     else:

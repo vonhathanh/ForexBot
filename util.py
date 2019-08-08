@@ -192,6 +192,8 @@ def plot_metrics(metrics):
         f.write("{:<25s}{:>5.2f}\n".format("Total win trades:", metrics['win_trades'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Total lose trades:", metrics['lose_trades'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metrics['avg_reward'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg win value:", metrics['avg_win_value'][-1]))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg lose value:", metrics['avg_lose_value'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Most profit trade win:", metrics['most_profit_trade'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Worst trade lose:", metrics['worst_trade'][-1]))
         f.write("{:<25s}{:>5.2f}\n".format("Win ratio:", metrics['win_trades'][-1] / (metrics['win_trades'][-1] + 1 + metrics['lose_trades'][-1])))

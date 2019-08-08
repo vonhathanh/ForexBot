@@ -14,7 +14,7 @@ class TradingEnv(gym.Env):
 
     def __init__(self, df,
                  look_back_window_size=50,
-                 commission=0.0003,
+                 commission=0.00003,
                  initial_balance=100*1000,
                  serial=False,
                  random=False):
@@ -46,12 +46,13 @@ class TradingEnv(gym.Env):
         self.init_metrics()
         np.random.seed(69)
 
-
     def init_metrics(self):
         # these properties are our metric for comparing different models
         self.win_trades = 0
         self.lose_trades = 0
         self.avg_reward = 0
+        self.avg_win_value = 0
+        self.avg_lose_value = 0
         self.num_step = 0
         self.most_profit_trade = 0
         self.worst_trade = 0
@@ -64,8 +65,10 @@ class TradingEnv(gym.Env):
                         "avg_reward": [],
                         "most_profit_trade": [],
                         "worst_trade": [],
-                        "net_worth": []}
-
+                        "net_worth": [],
+                        "avg_win_value": [],
+                        "avg_lose_value": []}
+        self.hold_trade = 0
 
     def get_metrics(self):
         return self.metrics
@@ -110,12 +113,20 @@ class TradingEnv(gym.Env):
     def get_current_price(self):
         return self.active_df.iloc[self.current_step].Close
 
-    def update_metrics(self):
-        if self.net_worth <= self.prev_networth:
-            self.lose_trades += 1
-        else:
-            self.win_trades += 1
+    def update_metrics(self, action):
+        profit = self.net_worth - self.prev_networth
         self.num_step += 1
+
+        if action == 0:
+            self.hold_trade += 1
+        else:
+            if self.net_worth < self.prev_networth:
+                self.lose_trades += 1
+                self.avg_lose_value = self.avg_lose_value + 1 / self.num_step * (-profit - self.avg_lose_value)
+            elif self.net_worth > self.prev_networth:
+                self.win_trades += 1
+                self.avg_win_value = self.avg_win_value + 1 / self.num_step * (profit - self.avg_win_value)
+
         self.avg_reward = self.avg_reward + 1 / self.num_step * (self.reward - self.avg_reward)
 
         if self.net_worth > self.highest_networth:
@@ -123,7 +134,6 @@ class TradingEnv(gym.Env):
         if self.net_worth < self.lowest_networth:
             self.lowest_networth = self.net_worth
 
-        profit = self.net_worth - self.prev_networth
         if profit > self.most_profit_trade:
             self.most_profit_trade = profit
         if profit < self.worst_trade:
@@ -144,7 +154,7 @@ class TradingEnv(gym.Env):
         obs = self.next_observation()
         done = self.net_worth <= 0
 
-        self.update_metrics()
+        self.update_metrics(action)
 
         if self.steps_left == 1:
             self.reset_session()
@@ -200,16 +210,23 @@ class TradingEnv(gym.Env):
             self.metrics["most_profit_trade"].append(self.most_profit_trade)
             self.metrics["worst_trade"].append(self.worst_trade)
             self.metrics["net_worth"].append(self.net_worth)
+            self.metrics["avg_win_value"].append(self.avg_win_value)
+            self.metrics["avg_lose_value"].append(self.avg_lose_value)
+
+
 
             print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
             print("{:<25s}{:>5.2f}".format("Total win trades:", self.win_trades))
             print("{:<25s}{:>5.2f}".format("Total lose trades:", self.lose_trades))
+            print("{:<25s}{:>5.2f}".format("Avg win value:", self.avg_win_value))
+            print("{:<25s}{:>5.2f}".format("Avg lose value:", self.avg_lose_value))
             print("{:<25s}{:>5.2f}".format("Avg reward:", self.avg_reward))
             print("{:<25s}{:>5.2f}".format("Highest net worth:", self.highest_networth))
             print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.lowest_networth))
             print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.most_profit_trade))
             print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.worst_trade))
             print("{:<25s}{:>5.2f}".format("Win ratio:", self.win_trades / (self.lose_trades + 1 + self.win_trades)))
+            print('-'*80)
 
 
 class LSTM_Env(TradingEnv):
