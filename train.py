@@ -64,7 +64,6 @@ if __name__ == '__main__':
         print("Start testing on train set")
         evaluate_train_set(model, train_env)
 
-
         if args.test_mode == 'double':
             print("Start testing on test set")
             evaluate_test_set(model, test_env)

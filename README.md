@@ -4,10 +4,10 @@
 3. Train our agent to learn a profitable strategy (train.py)  
 4. Evaluate our agent's performance on test data and real-time trading (test.py)  
 # Requirements  
-Environment: python 3.6  
-Requirement: see requirements.txt  
-Data source: https://forextester.com/data/datasources  
-Time frame: 1 minutes (230300 <=> 23:03:00)  
+- Environment: python 3.6  
+- Requirement: see requirements.txt  
+- Data source: https://forextester.com/data/datasources  
+- Time frame: 1 minutes (230300 <=> 23:03:00)  
 # Agent design  
 - Action space: buy, sell, hold.  
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  

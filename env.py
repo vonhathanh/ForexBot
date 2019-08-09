@@ -14,7 +14,7 @@ class TradingEnv(gym.Env):
 
     def __init__(self, df,
                  look_back_window_size=50,
-                 commission=0.00003,
+                 commission=0.0001,
                  initial_balance=100*1000,
                  serial=False,
                  random=False):
@@ -56,8 +56,8 @@ class TradingEnv(gym.Env):
         self.num_step = 0
         self.most_profit_trade = 0
         self.worst_trade = 0
-        self.highest_networth = self.initial_balance
-        self.lowest_networth = self.initial_balance
+        self.highest_net_worth = self.initial_balance
+        self.lowest_net_worth = self.initial_balance
         # create metrics dict for plotting purpose
         self.metrics = {"num_step": [],
                         "win_trades": [],
@@ -66,8 +66,10 @@ class TradingEnv(gym.Env):
                         "most_profit_trade": [],
                         "worst_trade": [],
                         "net_worth": [],
-                        "avg_win_value": [],
-                        "avg_lose_value": []}
+                        "avg_win_value": 0,
+                        "avg_lose_value": 0,
+                        "highest_net_worth": 0,
+                        "lowest_net_worth": 0}
         self.hold_trade = 0
 
     def get_metrics(self):
@@ -129,10 +131,10 @@ class TradingEnv(gym.Env):
 
         self.avg_reward = self.avg_reward + 1 / self.num_step * (self.reward - self.avg_reward)
 
-        if self.net_worth > self.highest_networth:
-            self.highest_networth = self.net_worth
-        if self.net_worth < self.lowest_networth:
-            self.lowest_networth = self.net_worth
+        if self.net_worth > self.highest_net_worth:
+            self.highest_net_worth = self.net_worth
+        if self.net_worth < self.lowest_net_worth:
+            self.lowest_net_worth = self.net_worth
 
         if profit > self.most_profit_trade:
             self.most_profit_trade = profit
@@ -203,6 +205,7 @@ class TradingEnv(gym.Env):
                 self.current_step, self.net_worth, self.reward, window_size=self.look_back_window_size)
 
         if self.num_step % 50 == 0:
+            # save these variables for plotting
             self.metrics["num_step"].append(self.num_step)
             self.metrics["win_trades"].append(self.win_trades)
             self.metrics["lose_trades"].append(self.lose_trades)
@@ -210,10 +213,8 @@ class TradingEnv(gym.Env):
             self.metrics["most_profit_trade"].append(self.most_profit_trade)
             self.metrics["worst_trade"].append(self.worst_trade)
             self.metrics["net_worth"].append(self.net_worth)
-            self.metrics["avg_win_value"].append(self.avg_win_value)
-            self.metrics["avg_lose_value"].append(self.avg_lose_value)
-
-
+            self.metrics["lowest_net_worth"] = self.lowest_net_worth
+            self.metrics["highest_net_worth"] = self.highest_net_worth
 
             print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
             print("{:<25s}{:>5.2f}".format("Total win trades:", self.win_trades))
@@ -221,8 +222,8 @@ class TradingEnv(gym.Env):
             print("{:<25s}{:>5.2f}".format("Avg win value:", self.avg_win_value))
             print("{:<25s}{:>5.2f}".format("Avg lose value:", self.avg_lose_value))
             print("{:<25s}{:>5.2f}".format("Avg reward:", self.avg_reward))
-            print("{:<25s}{:>5.2f}".format("Highest net worth:", self.highest_networth))
-            print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.lowest_networth))
+            print("{:<25s}{:>5.2f}".format("Highest net worth:", self.highest_net_worth))
+            print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.lowest_net_worth))
             print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.most_profit_trade))
             print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.worst_trade))
             print("{:<25s}{:>5.2f}".format("Win ratio:", self.win_trades / (self.lose_trades + 1 + self.win_trades)))
