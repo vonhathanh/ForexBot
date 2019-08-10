@@ -19,9 +19,9 @@ TIME_FRAME = {
 }
 
 
-def evaluate_test_set(model, test_env):
+def evaluate_test_set(model, test_env, num_steps):
     obs = test_env.reset()
-    for i in range(len(test_df)):
+    for i in range(num_steps):
         action, _states = model.predict(obs)
         obs, reward, done, info = test_env.step(action)
         test_env.render(mode='verbose')
@@ -31,10 +31,10 @@ def evaluate_test_set(model, test_env):
     plot_metrics(test_env.get_attr('metrics')[0])
 
 
-def evaluate_train_set(model, train_env):
+def evaluate_train_set(model, train_env, num_steps):
     print("Start testing on train set (for overfitting check")
     obs = train_env.reset()
-    for i in range(6000):
+    for i in range(num_steps):
         action, _states = model.predict(obs)
         obs, reward, done, info = train_env.step(action)
         train_env.render(mode='verbose')
@@ -178,8 +178,8 @@ def plot_data(input_file):
     plt.show()
 
 
-def plot_metrics(metrics):
-
+def plot_metrics(metric):
+    metrics = metric.metrics
     ax1 = plt.subplot(2,3,1)
     ax1.plot(metrics['num_step'], metrics['win_trades'], label='win trades')
     ax1.plot(metrics['num_step'], metrics['lose_trades'], label='lose trades')
@@ -213,17 +213,17 @@ def plot_metrics(metrics):
         now = datetime.now()
         date = now.strftime("%Y-%m-%d, %H:%M:%S")
         f.write(date + "\n")
-        f.write("{:<25s}{:>5.2f}\n".format("Num step:", metrics['num_step'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Total win trades:", metrics['win_trades'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Total lose trades:", metrics['lose_trades'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metrics['avg_reward'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Avg win value:", metrics['avg_win_value']))
-        f.write("{:<25s}{:>5.2f}\n".format("Avg lose value:", metrics['avg_lose_value']))
-        f.write("{:<25s}{:>5.2f}\n".format("Most profit trade win:", metrics['most_profit_trade'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Worst trade lose:", metrics['worst_trade'][-1]))
-        f.write("{:<25s}{:>5.2f}\n".format("Highest net worth:", metrics['highest_net_worth']))
-        f.write("{:<25s}{:>5.2f}\n".format("Lowest net worth:", metrics['lowest_net_worth']))
-        f.write("{:<25s}{:>5.2f}\n".format("Win ratio:", metrics['win_trades'][-1] / (metrics['win_trades'][-1] + 1 + metrics['lose_trades'][-1])))
+        f.write("{:<25s}{:>5.2f}\n".format("Num step:", metric.num_step))
+        f.write("{:<25s}{:>5.2f}\n".format("Total win trades:", metric.win_trades))
+        f.write("{:<25s}{:>5.2f}\n".format("Total lose trades:", metric.lose_trades))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metric.avg_reward))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg win value:", metric.avg_win_value))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg lose value:", metric.avg_lose_value))
+        f.write("{:<25s}{:>5.2f}\n".format("Most profit trade win:", metric.most_profit_trade))
+        f.write("{:<25s}{:>5.2f}\n".format("Worst trade lose:", metric.worst_trade))
+        f.write("{:<25s}{:>5.2f}\n".format("Highest net worth:", metric.highest_net_worth))
+        f.write("{:<25s}{:>5.2f}\n".format("Lowest net worth:", metric.lowest_net_worth))
+        f.write("{:<25s}{:>5.2f}\n".format("Win ratio:", metric.win_trades / (metric.win_trades + 1 + metric.lose_trades)))
         f.write("-" * 80 + "\n")
 
 

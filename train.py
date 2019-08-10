@@ -28,7 +28,7 @@ if __name__ == '__main__':
     if args.mode == "train":
         print("Training started")
         model = PPO2(MlpPolicy, train_env, verbose=1, tensorboard_log='./logs', nminibatches=1)
-        model.learn(total_timesteps=1000000, seed=69)
+        model.learn(total_timesteps=1000, seed=69)
         model.save("./models/mlp_model")
         print("Training's done, saved model to ./models/mlp_model")
     else:
@@ -37,13 +37,15 @@ if __name__ == '__main__':
         model = PPO2.load("./models/mlp_model.pkl")
 
         print("Start testing on train set")
-        evaluate_train_set(model, train_env)
+        evaluate_train_set(model, train_env, 3000)
 
         if args.test_mode == 'double':
             print("Start testing on test set")
-            evaluate_test_set(model, test_env)
+            evaluate_test_set(model, test_env, len(test_df))
 
         print("Testing's comeplete")
+
+
 
 
 
