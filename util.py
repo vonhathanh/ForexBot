@@ -19,6 +19,31 @@ TIME_FRAME = {
 }
 
 
+def evaluate_test_set(model, test_env):
+    obs = test_env.reset()
+    for i in range(len(test_df)):
+        action, _states = model.predict(obs)
+        obs, reward, done, info = test_env.step(action)
+        test_env.render(mode='verbose')
+        if done:
+            test_env.reset()
+
+    plot_metrics(test_env.get_attr('metrics')[0])
+
+
+def evaluate_train_set(model, train_env):
+    print("Start testing on train set (for overfitting check")
+    obs = train_env.reset()
+    for i in range(6000):
+        action, _states = model.predict(obs)
+        obs, reward, done, info = train_env.step(action)
+        train_env.render(mode='verbose')
+        if done:
+            train_env.reset()
+
+    plot_metrics(train_env.get_attr('metrics')[0])
+
+
 def save_file(df, input_file, output_file=None):
     # utility function to help save the file in proper format
     if output_file is not None:

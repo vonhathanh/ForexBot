@@ -6,16 +6,17 @@
 # Requirements  
 - Environment: python 3.6  
 - Requirement: see requirements.txt  
-- Data source: https://forextester.com/data/datasources  
+- Data source: https://www.histdata.com/download-free-forex-data/
 - Time frame: 1 minutes (230300 <=> 23:03:00)  
 # Agent design  
 - Action space: buy, sell, hold.  
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
 # TODO:  
-- Improve model accuracy (better reward function, standardize data, more features as input to our data)  
+- Investigate why our win rate is 50% eventhough we did overfit the data  
+- Improve model accuracy (better reward function, more features as input to our data)  
 - Using news data as feature, we must calculate avg time the market is affected by 
-news and then distribute it accordingly to current timeframe  
+news and then distribute it accordingly to current timeframe (halfly done) 
 - Display trade history   
 - Make action space more diversity  
 - Write unit test  
@@ -45,6 +46,6 @@ we may need to investigate later, because our goal is win rate >= 80%
 - Win rate is not everything in Fx trading but we still need it higher 50% for more security.
 - Althought our model is overfitted is still perform prety well on test set: x6 networth in about 6000 steps,  
 It also go bankrupt in 1-2000 steps later on which is the result that we expected.  
-- Our objective is now increase the avg win value per trade and win ratio as well as reduce the avg lose per trade  
+- Our objective is increase the avg win value per trade and win ratio as well as reduce the avg lose per trade  
 => First conclusion: more data is not really good for model if we don't understand and arrange the data correctly, 
 on the other hand, more training is really important in RL  

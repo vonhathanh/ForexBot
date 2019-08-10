@@ -4,33 +4,8 @@ import pandas as pd
 from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
-from util import plot_metrics
+from util import plot_metrics, evaluate_train_set, evaluate_test_set
 from env import TradingEnv, LSTM_Env
-
-
-def evaluate_test_set(model, test_env):
-    obs = test_env.reset()
-    for i in range(len(test_df)):
-        action, _states = model.predict(obs)
-        obs, reward, done, info = test_env.step(action)
-        test_env.render(mode='verbose')
-        if done:
-            test_env.reset()
-
-    plot_metrics(test_env.get_attr('metrics')[0])
-
-
-def evaluate_train_set(model, train_env):
-    print("Start testing on train set (for overfitting check")
-    obs = train_env.reset()
-    for i in range(6000):
-        action, _states = model.predict(obs)
-        obs, reward, done, info = train_env.step(action)
-        train_env.render(mode='verbose')
-        if done:
-            train_env.reset()
-
-    plot_metrics(train_env.get_attr('metrics')[0])
 
 
 if __name__ == '__main__':
