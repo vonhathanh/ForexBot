@@ -100,7 +100,7 @@ class TradingEnv(gym.Env):
         self.current_step += 1
         profit = self.net_worth - self.prev_net_worth
 
-        if profit == 0: profit += 5
+        if profit == 0: profit += 1
         self.reward = np.log(abs(profit)) if profit > 0 else -np.log(abs(profit))
 
         obs = self.next_observation()
@@ -189,11 +189,8 @@ class LSTM_Env(TradingEnv):
 
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(4, ),
+                                             shape=(9, ),
                                             dtype=np.float16)
-
-    def reset_session(self):
-        super().reset_session()
 
     def next_observation(self):
         obs = np.array([
@@ -202,39 +199,12 @@ class LSTM_Env(TradingEnv):
             self.active_df['High'].values[self.current_step],
             self.active_df['Low'].values[self.current_step],
             self.active_df['NormedClose'].values[self.current_step],
+            self.active_df['NormalizedTime'].values[self.current_step],
+            self.net_worth / LOT_SIZE,
+            self.prev_net_worth / LOT_SIZE,
+            self.eur_held / LOT_SIZE,
+            self.usd_held / LOT_SIZE
         ])
 
         return obs
 
-    def take_action(self, action, current_price):
-        amount = 0.5
-        # in forex, we buy with current price + comission (it's normaly 3 pip with eurusd pair)
-        buy_price = current_price + self.commission
-        sell_price = current_price
-
-        '''assume we have 100,000 usd and 0 eur
-        assume current price is 1.5 (1 eur = 1.5 usd)
-        assume comission = 3 pip = 0.0003
-        => true buy price = 1.5003, sell price = 1.5
-        buy 0.5 lot eur => we have 50,000 eur and (100,000 - 50,000 * 1.5003) = 24985 usd
-        => out networth: 50,000 * 1.5 + 24985 = 99985 (we lose 3 pip, 1 pip = 5 usd, 
-        we are using 0.5 lot as defaut, if we buy 1 lot => 1 pip = 10 usd, correct!!! )'''
-        if action == 1:  # buy eur, sell usd => increase eur held, decrease usd held
-            self.eur_held += amount * LOT_SIZE
-            self.usd_held -= amount * LOT_SIZE * buy_price
-
-        elif action == 2:  # sell eur => decrease eur held, increase usd held
-            self.eur_held -= amount * LOT_SIZE
-            self.usd_held += amount * LOT_SIZE * sell_price
-        else:  # hold
-            pass
-
-        self.prev_networth = self.net_worth
-        # convert our networth to pure usd
-        self.net_worth = self.usd_held + (
-            self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
-
-        if action == 1 or action == 2:
-            self.trades.append({'step': self.frame_start + self.current_step,
-                                'amount': amount,
-                                'type': "buy" if action == 1 else "sell"})
