@@ -20,6 +20,7 @@ TIME_FRAME = {
 
 
 def evaluate_test_set(model, test_env, num_steps):
+    """evaluate model on full test set"""
     obs = test_env.reset()
     for i in range(num_steps):
         action, _states = model.predict(obs)
@@ -32,6 +33,7 @@ def evaluate_test_set(model, test_env, num_steps):
 
 
 def evaluate_train_set(model, train_env, num_steps):
+    """evaluate model on train set"""
     print("Start testing on train set (for overfitting check")
     obs = train_env.reset()
     for i in range(num_steps):
@@ -55,6 +57,7 @@ def save_file(df, input_file, output_file=None):
 
 
 def convert_txt_to_csv(input_file, output_file=None):
+    """ convert file data from txt to csv"""
     print("Start convert: {} to csv".format(input_file))
     df = pd.read_csv(input_file,
                      sep=',',
@@ -75,11 +78,41 @@ def reduce_to_time_frame(input_file, tf_type, output_file=None):
     print("Start reduce time frame: to {}".format(tf_type))
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
+    # convert dataframe to numpy for faster processing speed
+    df_array = df.to_numpy()
 
     interval = TIME_FRAME[tf_type]
+    j = 0
+    start = 1
+    highest = -10
+    lowest = 10
 
+    for i in range(1, len(df)):
+        j += 1
+        # save lowest and highest price in INTERVAL we want
+        highest = max(highest, df_array[i][3])
+        lowest = min(lowest, df_array[i][4])
+
+        # convert time to integer then use it to check that we hit the limit of desire timeframe
+        time = int(str(df_array[i][1])[-2:])
+        if time % interval == 0:
+            # update row correspond to timeframe, row that divisible to timeframe's interval
+            df.iat[i, 3] = highest
+            df.iat[i, 4] = lowest
+            df.iat[i, 2] = df.iat[start, 2]
+            # reset variables
+            j = 0
+            highest = -10
+            lowest = 10
+            start = i+1
+
+        if i % 5000 == 0:
+            print("current step: ", i)
+
+    # get indices of rows we updated
     times = df.Time.apply(lambda x: str(x)[-2:]).astype(int)
     indices = times % interval == 0
+    # create new dataframe, using only indices we have collected.
     df = df[indices]
 
     df.reset_index(drop=True, inplace=True)
@@ -90,6 +123,7 @@ def reduce_to_time_frame(input_file, tf_type, output_file=None):
 
 def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
     # format dayofyear field from int (20110103) to datetime format (2011-01-03)
+    # WARNING: no longer used
     print("Start reformat datetime field")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
@@ -110,7 +144,8 @@ def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
 
 
 def reformat_time(input_file, output_file=None):
-    # format time field from int (85200) to datetime format (08:05:00)
+    # format time field from int (0055) to datetime format (00:55)
+    # WARNING: no longer used
     print("Start reformat Time field")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
@@ -216,7 +251,7 @@ def plot_metrics(metric):
         f.write("{:<25s}{:>5.2f}\n".format("Num step:", metric.num_step))
         f.write("{:<25s}{:>5.2f}\n".format("Total win trades:", metric.win_trades))
         f.write("{:<25s}{:>5.2f}\n".format("Total lose trades:", metric.lose_trades))
-        f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metric.avg_reward))
+        f.write("{:<25s}{:>5.2f}\n".format("Avg reward:", metric.avg_reward / metric.num_step))
         f.write("{:<25s}{:>5.2f}\n".format("Avg win value:", metric.avg_win_value))
         f.write("{:<25s}{:>5.2f}\n".format("Avg lose value:", metric.avg_lose_value))
         f.write("{:<25s}{:>5.2f}\n".format("Most profit trade win:", metric.most_profit_trade))
@@ -255,6 +290,7 @@ def merge_data_2012_2018():
 
     save_file(data_2012_2018, input_file="./data/EURUSD.csv")
 
+
 def merge_data_2019():
     data_2019_01 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201901.csv',
                             names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
@@ -285,6 +321,7 @@ def merge_data_2019():
 
 
 def encode_time(input_file, output_file=None):
+    # encode time feature to floating values, range [0-1]
     print("Start encode time")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
@@ -300,6 +337,7 @@ def encode_time(input_file, output_file=None):
     save_file(df, input_file, output_file)
     print("encode time complete!")
 
+
 def standardize_data(df):
     df["NormedClose"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
     df["Open"] = (np.log(df['Open']) - np.log(df['Open']).shift(1)) * 100
@@ -311,9 +349,8 @@ def standardize_data(df):
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
-    # reformat_date_of_year("./data/EURUSD_m15.csv")
-    # reformat_time("./data/EURUSD_m15.csv")
-    plot_data('./data/EURUSD_m15_train.csv')
+
+    # plot_data('./data/EURUSD_m15_train.csv')
     # metrics = {"num_step": np.linspace(1, 10),
     #            "win_trades": np.linspace(1, 10),
     #            "lose_trades": np.linspace(1, 10),
@@ -326,7 +363,7 @@ if __name__ == '__main__':
     # plot_metrics(metrics)
 
     # encode_time("./data/EURUSD_m15.csv")
-    # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
+    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
 
     pass
 
