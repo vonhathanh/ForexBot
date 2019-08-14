@@ -3,8 +3,8 @@ import pandas as pd
 
 from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
-from stable_baselines import PPO2
-from util import plot_metrics, evaluate_train_set, evaluate_test_set
+from stable_baselines import PPO2, A2C
+from util import evaluate_train_set, evaluate_test_set
 from env import TradingEnv, LSTM_Env
 
 
@@ -30,24 +30,24 @@ if __name__ == '__main__':
     if args.model == 'mlp':
         train_env = DummyVecEnv([lambda: TradingEnv(train_df)])
         test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
-        model = PPO2(MlpPolicy, train_env, gamma=0.9, verbose=1, tensorboard_log='./logs')
+        model = PPO2(MlpPolicy, train_env, gamma=0.95, verbose=1, tensorboard_log='./logs')
     else:
         train_env = DummyVecEnv([lambda: LSTM_Env(train_df)])
         test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial=True)])
-        policy_kwargs = dict(net_arch=[128, 64, 'lstm'])
-        model = PPO2('MlpLstmPolicy',
+
+        policy_kwargs = dict(net_arch=[64, 64, 'lstm'])
+        model = PPO2(MlpLstmPolicy,
                      train_env,
-                     gamma=0.9,
+                     gamma=0.95,
                      verbose=1,
                      tensorboard_log='./logs',
-                     nminibatches=1,
-                     policy_kwargs=policy_kwargs)
+                     nminibatches=1)
 
     save_path = "./models/" + args.model + "_model"
 
     if args.mode == "train":
         print("Training started")
-        model.learn(total_timesteps=10000, seed=69)
+        model.learn(total_timesteps=500000, seed=69)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:

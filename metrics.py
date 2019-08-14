@@ -38,7 +38,7 @@ class Metric:
                 self.win_trades += 1
                 self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
 
-        self.avg_reward += (1 / self.num_step * (reward - self.avg_reward))
+        self.avg_reward += reward
 
         self.highest_net_worth = max(net_worth, self.highest_net_worth)
         self.lowest_net_worth = min(net_worth, self.lowest_net_worth)
@@ -50,7 +50,7 @@ class Metric:
         self.metrics["num_step"].append(self.num_step)
         self.metrics["win_trades"].append(self.win_trades)
         self.metrics["lose_trades"].append(self.lose_trades)
-        self.metrics["avg_reward"].append(self.avg_reward)
+        self.metrics["avg_reward"].append(self.avg_reward / self.num_step)
         self.metrics["most_profit_trade"].append(self.most_profit_trade)
         self.metrics["worst_trade"].append(self.worst_trade)
         self.metrics["net_worth"].append(self.net_worth)
