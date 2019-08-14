@@ -26,6 +26,7 @@ class TradingEnv(gym.Env):
         self.look_back_window_size = look_back_window_size
         self.initial_balance = initial_balance
         self.net_worth = self.initial_balance
+        self.prev_net_worth = self.net_worth
         self.eur_held = 0
         self.usd_held = self.initial_balance
         self.trades = []
@@ -98,10 +99,10 @@ class TradingEnv(gym.Env):
         self.take_action(action, current_price)
         self.steps_left -= 1
         self.current_step += 1
-        profit = self.net_worth - self.prev_net_worth
-
-        if profit == 0: profit += 1
-        self.reward = np.log(abs(profit)) if profit > 0 else -np.log(abs(profit))
+        if self.prev_net_worth <= 0 or self.net_worth <= 0:
+            self.reward = -5
+        else:
+            self.reward = np.log(self.net_worth / (self.prev_net_worth + 0.0001))
 
         obs = self.next_observation()
         done = self.net_worth <= 0
@@ -164,7 +165,7 @@ class TradingEnv(gym.Env):
             print("{:<25s}{:>5.2f}".format("Total hold trades:", self.metrics.hold_trades))
             print("{:<25s}{:>5.2f}".format("Avg win value:", self.metrics.avg_win_value))
             print("{:<25s}{:>5.2f}".format("Avg lose value:", self.metrics.avg_lose_value))
-            print("{:<25s}{:>5.2f}".format("Avg reward:", self.metrics.avg_reward))
+            print("{:<25s}{:>5.2f}".format("Avg reward:", self.metrics.avg_reward / self.metrics.num_step))
             print("{:<25s}{:>5.2f}".format("Highest net worth:", self.metrics.highest_net_worth))
             print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.metrics.lowest_net_worth))
             print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.metrics.most_profit_trade))
