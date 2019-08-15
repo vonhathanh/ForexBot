@@ -13,11 +13,12 @@
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
 # TODO:  
-- Normalize reward and other input features
+- Split data to episodes, each episode contains 1 week data, shuffle those episodes  
+- Normalize reward and other input features  
 - Investigate why our win rate is 50% eventhough we did overfit the data  
 - Improve model accuracy (better reward function, more features as input to our data)  
 - Using news data as feature, we must calculate avg time the market is affected by 
-news and then distribute it accordingly to current timeframe (halfly done) 
+news and then distribute it accordingly to current timeframe (halfly done)  
 - Display trade history   
 - Make action space more diversity  
 - Write unit test  

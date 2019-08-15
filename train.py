@@ -41,8 +41,7 @@ if __name__ == '__main__':
                      gamma=0.98,
                      verbose=1,
                      tensorboard_log='./logs',
-                     nminibatches=1,
-                     n_steps=4)
+                     nminibatches=1)
 
     save_path = "./models/" + args.model + "_model"
 

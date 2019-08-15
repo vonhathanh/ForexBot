@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+import pandas as pd
 
 from sklearn.preprocessing import StandardScaler
 from trading_graph import StockTradingGraph
@@ -179,7 +180,7 @@ class TradingEnv(gym.Env):
 
 class LSTM_Env(TradingEnv):
 
-    def __init__(self, df, look_back_window_size=50,
+    def __init__(self, df, look_back_window_size=8,
                  commission=0.0003,
                  initial_balance=100*1000,
                  serial=False,
@@ -190,9 +191,11 @@ class LSTM_Env(TradingEnv):
                  serial,
                  random)
 
+        self.episode_indices = self.get_episode()
+
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(9, ),
+                                             shape=(10, ),
                                             dtype=np.float16)
 
     def next_observation(self):
@@ -210,4 +213,10 @@ class LSTM_Env(TradingEnv):
         ])
 
         return obs
+
+    def get_episode(self):
+        self.df["formatted_date"] = pd.to_datetime(self.df['DayOfYear'])
+        self.df["dayOfWeek"] = self.df.formatted_date.apply(lambda x: x.dayofweek)
+        print(self.df["dayOfWeek"])
+        return None
 
