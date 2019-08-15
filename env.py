@@ -22,7 +22,7 @@ class TradingEnv(gym.Env):
                  random=False):
 
         super(TradingEnv, self).__init__()
-        self.df = standardize_data(df).dropna().reset_index(drop=True)
+        self.df = standardize_data(df, method="z_norm").dropna().reset_index(drop=True)
         self.look_back_window_size = look_back_window_size
         self.initial_balance = initial_balance
         self.net_worth = self.initial_balance
@@ -35,6 +35,7 @@ class TradingEnv(gym.Env):
         self.random = random
         self.commission = commission
         self.serial = serial
+        self.action = 0
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
         # action: buy, sell, hold <=> 0, 1, 2
@@ -99,6 +100,7 @@ class TradingEnv(gym.Env):
         self.take_action(action, current_price)
         self.steps_left -= 1
         self.current_step += 1
+        self.action = action
         if self.prev_net_worth <= 0 or self.net_worth <= 0:
             self.reward = -5
         else:
@@ -195,12 +197,12 @@ class LSTM_Env(TradingEnv):
 
     def next_observation(self):
         obs = np.array([
-            # self.active_df['NormalizedTime'].values[self.current_step: end],
             self.active_df['Open'].values[self.current_step],
             self.active_df['High'].values[self.current_step],
             self.active_df['Low'].values[self.current_step],
             self.active_df['NormedClose'].values[self.current_step],
             self.active_df['NormalizedTime'].values[self.current_step],
+            self.action,
             self.net_worth / LOT_SIZE,
             self.prev_net_worth / LOT_SIZE,
             self.eur_held / LOT_SIZE,

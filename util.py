@@ -7,6 +7,8 @@ import time
 from datetime import datetime
 
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
+from sklearn.preprocessing import StandardScaler
+
 TIME_FRAME = {
     "m1": 1,
     "m5": 5,
@@ -338,11 +340,20 @@ def encode_time(input_file, output_file=None):
     print("encode time complete!")
 
 
-def standardize_data(df):
-    df["NormedClose"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
-    df["Open"] = (np.log(df['Open']) - np.log(df['Open']).shift(1)) * 100
-    df["High"] = (np.log(df['High']) - np.log(df['High']).shift(1)) * 100
-    df["Low"] = (np.log(df['Low']) - np.log(df['Low']).shift(1)) * 100
+def standardize_data(df, method='log_and_diff'):
+    if method == 'log_and_diff':
+        df["NormedClose"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
+        df["Open"] = (np.log(df['Open']) - np.log(df['Open']).shift(1)) * 100
+        df["High"] = (np.log(df['High']) - np.log(df['High']).shift(1)) * 100
+        df["Low"] = (np.log(df['Low']) - np.log(df['Low']).shift(1)) * 100
+    elif method == 'z_norm':
+        scaler = StandardScaler()
+        df["NormedClose"] = scaler.fit_transform(df['Close'].to_numpy().reshape((-1, 1)))
+        df["Open"] = scaler.fit_transform(df['Open'].to_numpy().reshape((-1, 1)))
+        df["High"] = scaler.fit_transform(df['High'].to_numpy().reshape((-1, 1)))
+        df["Low"] = scaler.fit_transform(df['Low'].to_numpy().reshape((-1, 1)))
+    else:
+        raise RuntimeError("Unknown normalization method, valid methods are: log_and_diff, z_norm")
     return df
 
 
@@ -350,7 +361,7 @@ if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
 
-    # plot_data('./data/EURUSD_m15_train.csv')
+    plot_data('./data/EURUSD_m15_train.csv')
     # metrics = {"num_step": np.linspace(1, 10),
     #            "win_trades": np.linspace(1, 10),
     #            "lose_trades": np.linspace(1, 10),
