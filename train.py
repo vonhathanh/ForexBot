@@ -3,7 +3,7 @@ import pandas as pd
 
 from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
-from stable_baselines import PPO2, A2C
+from stable_baselines import PPO2
 from util import evaluate_train_set, evaluate_test_set
 from env import TradingEnv, LSTM_Env
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     if args.model == 'mlp':
         train_env = DummyVecEnv([lambda: TradingEnv(train_df)])
         test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
-        model = PPO2(MlpPolicy, train_env, gamma=0.95, verbose=1, tensorboard_log='./logs', )
+        model = PPO2(MlpPolicy, train_env, gamma=0.95, verbose=1, tensorboard_log='./logs')
     else:
         train_env = DummyVecEnv([lambda: LSTM_Env(train_df)])
         test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial=True)])

@@ -327,15 +327,22 @@ def encode_time(input_file, output_file=None):
     print("Start encode time")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
+    df["dayOfWeek"] = pd.to_datetime(df['DayOfYear'])
+    df["dayOfWeek"] = df.dayOfWeek.apply(lambda x: x.dayofweek)
 
     def encode(x):
         hour = int(x[0:2])
         minute = int(x[3:5])
         current_time = hour * 60 + minute
-        encoded_time = current_time / (24 * 60)
-        return encoded_time
+        return current_time
 
-    df['NormalizedTime'] = df['Time'].apply(lambda x: encode(x))
+    df['timeInMinute'] = df['Time'].apply(lambda x: encode(x))
+    df['timeEncodedX'] = np.sin(2 * np.pi * df.timeInMinute / (1425))
+    df['timeEncodedY'] = np.cos(2 * np.pi * df.timeInMinute / (1425))
+    df['dayEncodedX'] = np.sin(2 * np.pi * df.dayOfWeek / 5)
+    df['dayEncodedY'] = np.cos(2 * np.pi * df.dayOfWeek / 5)
+    df.drop(["timeInMinute"], axis=1, inplace=True)
+
     save_file(df, input_file, output_file)
     print("encode time complete!")
 
@@ -361,7 +368,7 @@ if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
 
-    plot_data('./data/EURUSD_m15_train.csv')
+    # plot_data('./data/EURUSD_m15_train.csv')
     # metrics = {"num_step": np.linspace(1, 10),
     #            "win_trades": np.linspace(1, 10),
     #            "lose_trades": np.linspace(1, 10),
@@ -373,7 +380,7 @@ if __name__ == '__main__':
     #
     # plot_metrics(metrics)
 
-    # encode_time("./data/EURUSD_m15.csv")
+    encode_time("./data/EURUSD_m15.csv")
     split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
 
     pass

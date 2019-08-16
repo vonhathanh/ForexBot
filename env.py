@@ -192,6 +192,7 @@ class LSTM_Env(TradingEnv):
                  random)
 
         self.episode_indices = self.get_episode()
+        print("episode indices", self.episode_indices)
 
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
@@ -215,8 +216,14 @@ class LSTM_Env(TradingEnv):
         return obs
 
     def get_episode(self):
-        self.df["formatted_date"] = pd.to_datetime(self.df['DayOfYear'])
-        self.df["dayOfWeek"] = self.df.formatted_date.apply(lambda x: x.dayofweek)
-        print(self.df["dayOfWeek"])
-        return None
+
+        def get_start_and_end_week_indices(row):
+            if row.dayOfWeek == 4 and row.Time == "16:45":
+                return row.name
+            return -1
+
+        indices = self.df.apply(lambda x: get_start_and_end_week_indices(x), axis=1)
+        indices = indices[indices != -1].to_numpy()
+
+        return indices
 
