@@ -10,33 +10,30 @@ from metrics import Metric
 
 MAX_TRADING_SESSION = 2000
 LOT_SIZE = 100000
+WINDOW_SIZE = 8
+INITIAL_BALANCE = 100000
+COMISSION = 0.0001
 
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
 
     def __init__(self, df,
-                 look_back_window_size=8,
-                 commission=0.0001,
-                 initial_balance=100*1000,
                  serial=False,
                  random=False):
 
         super(TradingEnv, self).__init__()
         self.df = standardize_data(df, method="z_norm").dropna().reset_index(drop=True)
-        self.look_back_window_size = look_back_window_size
-        self.initial_balance = initial_balance
-        self.net_worth = self.initial_balance
-        self.prev_net_worth = self.net_worth
+        self.net_worth = INITIAL_BALANCE
+        self.prev_net_worth = INITIAL_BALANCE
+        self.usd_held = INITIAL_BALANCE
         self.eur_held = 0
-        self.usd_held = self.initial_balance
-        self.trades = []
         self.current_step = 0
         self.reward = 0
-        self.random = random
-        self.commission = commission
-        self.serial = serial
         self.action = 0
+        self.random = random
+        self.serial = serial
+        self.trades = []
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
         # action: buy, sell, hold <=> 0, 1, 2
@@ -46,9 +43,9 @@ class TradingEnv(gym.Env):
         # observe the OHCL values, networth, time, and trade history (eur held, usd held, actions)
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(4, look_back_window_size + 1),
+                                             shape=(4, WINDOW_SIZE + 1),
                                             dtype=np.float16)
-        self.metrics = Metric(initial_balance)
+        self.metrics = Metric(INITIAL_BALANCE)
         np.random.seed(69)
 
     def get_metrics(self):
@@ -62,21 +59,21 @@ class TradingEnv(gym.Env):
     def reset_variables(self):
         # reset all variables that involve with the environment
         self.current_step = 0
-        self.net_worth = self.initial_balance
-        self.prev_net_worth = self.initial_balance
+        self.net_worth = INITIAL_BALANCE
+        self.prev_net_worth = INITIAL_BALANCE
+        self.usd_held = INITIAL_BALANCE
         self.eur_held = 0
-        self.usd_held = self.initial_balance
         self.trades = []
 
     def setup_active_df(self):
         if self.serial:
-            self.steps_left = len(self.df) - self.look_back_window_size - 1
-            self.frame_start = self.look_back_window_size
+            self.steps_left = len(self.df) - WINDOW_SIZE - 1
+            self.frame_start = WINDOW_SIZE
         else:
             self.steps_left = np.random.randint(500, MAX_TRADING_SESSION)
-            self.frame_start = np.random.randint(self.look_back_window_size, len(self.df) - self.steps_left)
+            self.frame_start = np.random.randint(WINDOW_SIZE, len(self.df) - self.steps_left)
 
-        self.active_df = self.df[self.frame_start - self.look_back_window_size : self.frame_start + self.steps_left]
+        self.active_df = self.df[self.frame_start - WINDOW_SIZE : self.frame_start + self.steps_left]
 
 
     def reset_session(self):
@@ -86,7 +83,7 @@ class TradingEnv(gym.Env):
 
     def next_observation(self):
         # return the next observation of the environment
-        end = self.current_step + self.look_back_window_size + 1
+        end = self.current_step + WINDOW_SIZE + 1
 
         obs = np.array([
             # self.active_df['NormalizedTime'].values[self.current_step: end],
@@ -128,7 +125,7 @@ class TradingEnv(gym.Env):
     def take_action(self, action, current_price):
         amount = 0.5
         # in forex, we buy with current price + comission (it's normaly 3 pip with eurusd pair)
-        buy_price = current_price + self.commission
+        buy_price = current_price + COMISSION
         sell_price = current_price
 
         '''assume we have 100,000 usd and 0 eur
@@ -161,9 +158,9 @@ class TradingEnv(gym.Env):
         if mode == 'human':
             if not hasattr(self, 'visualization'):
                 self.visualization = StockTradingGraph(self.df, "Reward visualization")
-            if self.current_step > self.look_back_window_size and mode == 'human':
+            if self.current_step > WINDOW_SIZE and mode == 'human':
                 self.visualization.render(
-                    self.current_step, self.net_worth, self.reward, window_size=self.look_back_window_size)
+                    self.current_step, self.net_worth, self.reward, window_size=WINDOW_SIZE)
 
         if self.metrics.num_step % 50 == 0:
             # save these variables for plotting
@@ -187,49 +184,47 @@ class TradingEnv(gym.Env):
 
 class LSTM_Env(TradingEnv):
 
-    def __init__(self, df, look_back_window_size=8,
-                 commission=0.0003,
-                 initial_balance=100*1000,
+    def __init__(self, df,
                  serial=False,
                  random=False):
-        super().__init__(df, look_back_window_size,
-                 commission,
-                 initial_balance,
-                 serial,
-                 random)
+        super().__init__(df, serial, random)
 
         self.episode_indices = get_episode(self.df)
 
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(10, look_back_window_size + 1),
+                                             shape=(10, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.setup_active_df()
-        self.actions = np.zeros(len(self.active_df) + look_back_window_size)
-        self.net_worth_history = np.zeros(len(self.active_df) + look_back_window_size)
+        self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
 
     def setup_active_df(self):
-        # pick random episode index from our db
-        episode_index = np.random.randint(0, len(self.episode_indices))
-        episode = self.episode_indices[episode_index]
-        # get the data we want
-        self.steps_left = episode[1] - episode[0] - self.look_back_window_size
-        self.frame_start = episode[0]
-        self.active_df = self.df[episode[0]: episode[0] + episode[1]]
+        if self.serial:
+            self.steps_left = len(self.df) - WINDOW_SIZE - 1
+            self.frame_start = WINDOW_SIZE
+        else:
+            # pick random episode index from our db
+            episode_index = np.random.randint(0, len(self.episode_indices))
+            episode = self.episode_indices[episode_index]
+            # get the data we want
+            self.steps_left = episode[1] - episode[0] - WINDOW_SIZE
+            self.frame_start = episode[0]
+            self.active_df = self.df[episode[0]: episode[0] + episode[1]]
 
     def reset_variables(self):
         super().reset_variables()
-        self.actions = np.zeros(len(self.active_df) + self.look_back_window_size)
-        self.net_worth_history = np.zeros(len(self.active_df) + self.look_back_window_size)
+        self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
 
     def take_action(self, action, current_price):
         super().take_action(action, current_price)
-        self.actions[self.current_step + self.look_back_window_size] = action
-        self.net_worth_history[self.current_step + self.look_back_window_size] = (self.net_worth - self.prev_net_worth) /LOT_SIZE
+        self.actions[self.current_step + WINDOW_SIZE] = action
+        self.net_worth_history[self.current_step + WINDOW_SIZE] = (self.net_worth - self.prev_net_worth) /LOT_SIZE
 
     def next_observation(self):
         # return the next observation of the environment
-        end = self.current_step + self.look_back_window_size + 1
+        end = self.current_step + WINDOW_SIZE + 1
         obs = np.array([
             self.active_df['Open'].values[self.current_step: end],
             self.active_df['High'].values[self.current_step: end],
@@ -241,8 +236,6 @@ class LSTM_Env(TradingEnv):
             self.active_df['dayEncodedY'].values[self.current_step: end],
             self.actions[self.current_step: end],
             self.net_worth_history[self.current_step: end]
-            # self.eur_held / LOT_SIZE,
-            # self.usd_held / LOT_SIZE
         ])
 
         return obs
