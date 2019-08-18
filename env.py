@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from trading_graph import StockTradingGraph
 from gym import spaces
-from util import standardize_data
+from util import standardize_data, get_episode
 from metrics import Metric
 
 MAX_TRADING_SESSION = 2000
@@ -16,7 +16,7 @@ class TradingEnv(gym.Env):
 
 
     def __init__(self, df,
-                 look_back_window_size=50,
+                 look_back_window_size=8,
                  commission=0.0001,
                  initial_balance=100*1000,
                  serial=False,
@@ -59,7 +59,7 @@ class TradingEnv(gym.Env):
         self.reset_session()
         return self.next_observation()
 
-    def reset_session(self):
+    def reset_variables(self):
         # reset all variables that involve with the environment
         self.current_step = 0
         self.net_worth = self.initial_balance
@@ -68,6 +68,7 @@ class TradingEnv(gym.Env):
         self.usd_held = self.initial_balance
         self.trades = []
 
+    def setup_active_df(self):
         if self.serial:
             self.steps_left = len(self.df) - self.look_back_window_size - 1
             self.frame_start = self.look_back_window_size
@@ -76,6 +77,12 @@ class TradingEnv(gym.Env):
             self.frame_start = np.random.randint(self.look_back_window_size, len(self.df) - self.steps_left)
 
         self.active_df = self.df[self.frame_start - self.look_back_window_size : self.frame_start + self.steps_left]
+
+
+    def reset_session(self):
+        # reset all variables that involve with the environment
+        self.reset_variables()
+        self.setup_active_df()
 
     def next_observation(self):
         # return the next observation of the environment
@@ -191,39 +198,54 @@ class LSTM_Env(TradingEnv):
                  serial,
                  random)
 
-        self.episode_indices = self.get_episode()
-        print("episode indices", self.episode_indices)
+        self.episode_indices = get_episode(self.df)
 
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(10, ),
+                                             shape=(10, look_back_window_size + 1),
                                             dtype=np.float16)
+        self.setup_active_df()
+        self.actions = np.zeros(len(self.active_df) + look_back_window_size)
+        self.net_worth_history = np.zeros(len(self.active_df) + look_back_window_size)
+
+    def setup_active_df(self):
+        # pick random episode index from our db
+        episode_index = np.random.randint(0, len(self.episode_indices))
+        episode = self.episode_indices[episode_index]
+        # get the data we want
+        self.steps_left = episode[1] - episode[0] - self.look_back_window_size
+        self.frame_start = episode[0]
+        self.active_df = self.df[episode[0]: episode[0] + episode[1]]
+
+    def reset_variables(self):
+        super().reset_variables()
+        self.actions = np.zeros(len(self.active_df) + self.look_back_window_size)
+        self.net_worth_history = np.zeros(len(self.active_df) + self.look_back_window_size)
+
+    def take_action(self, action, current_price):
+        super().take_action(action, current_price)
+        self.actions[self.current_step + self.look_back_window_size] = action
+        self.net_worth_history[self.current_step + self.look_back_window_size] = (self.net_worth - self.prev_net_worth) /LOT_SIZE
 
     def next_observation(self):
+        # return the next observation of the environment
+        end = self.current_step + self.look_back_window_size + 1
         obs = np.array([
-            self.active_df['Open'].values[self.current_step],
-            self.active_df['High'].values[self.current_step],
-            self.active_df['Low'].values[self.current_step],
-            self.active_df['NormedClose'].values[self.current_step],
-            self.active_df['NormalizedTime'].values[self.current_step],
-            self.action,
-            self.net_worth / LOT_SIZE,
-            self.prev_net_worth / LOT_SIZE,
-            self.eur_held / LOT_SIZE,
-            self.usd_held / LOT_SIZE
+            self.active_df['Open'].values[self.current_step: end],
+            self.active_df['High'].values[self.current_step: end],
+            self.active_df['Low'].values[self.current_step: end],
+            self.active_df['NormedClose'].values[self.current_step: end],
+            self.active_df['timeEncodedX'].values[self.current_step: end],
+            self.active_df['timeEncodedY'].values[self.current_step: end],
+            self.active_df['dayEncodedX'].values[self.current_step: end],
+            self.active_df['dayEncodedY'].values[self.current_step: end],
+            self.actions[self.current_step: end],
+            self.net_worth_history[self.current_step: end]
+            # self.eur_held / LOT_SIZE,
+            # self.usd_held / LOT_SIZE
         ])
 
         return obs
 
-    def get_episode(self):
 
-        def get_start_and_end_week_indices(row):
-            if row.dayOfWeek == 4 and row.Time == "16:45":
-                return row.name
-            return -1
-
-        indices = self.df.apply(lambda x: get_start_and_end_week_indices(x), axis=1)
-        indices = indices[indices != -1].to_numpy()
-
-        return indices
 
