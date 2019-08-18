@@ -337,8 +337,8 @@ def encode_time(input_file, output_file=None):
         return current_time
 
     df['timeInMinute'] = df['Time'].apply(lambda x: encode(x))
-    df['timeEncodedX'] = np.sin(2 * np.pi * df.timeInMinute / (1425))
-    df['timeEncodedY'] = np.cos(2 * np.pi * df.timeInMinute / (1425))
+    df['timeEncodedX'] = np.sin(2 * np.pi * df.timeInMinute / 1425)
+    df['timeEncodedY'] = np.cos(2 * np.pi * df.timeInMinute / 1425)
     df['dayEncodedX'] = np.sin(2 * np.pi * df.dayOfWeek / 5)
     df['dayEncodedY'] = np.cos(2 * np.pi * df.dayOfWeek / 5)
     df.drop(["timeInMinute"], axis=1, inplace=True)
@@ -362,6 +362,27 @@ def standardize_data(df, method='log_and_diff'):
     else:
         raise RuntimeError("Unknown normalization method, valid methods are: log_and_diff, z_norm")
     return df
+
+
+def get_episode(df):
+    # get indices of episode in data frame, each episode is one week data
+
+    def get_end_week_indices(row):
+        # get index of one week trading session,
+        # weekend at day = 4 (thursday and time = 16:45
+        if row.dayOfWeek == 4 and row.Time == "16:45":
+            return row.name
+        return -1
+
+    indices = df.apply(lambda x: get_end_week_indices(x), axis=1)
+    indices = indices[indices != -1].to_numpy()
+    true_indices = [(0, indices[0])]
+
+    # append start week index to make a list of tuple contains (start, end) indices
+    for i in range(1, len(indices)):
+        true_indices.append((indices[i-1] + 1, indices[i]))
+
+    return true_indices
 
 
 if __name__ == '__main__':
