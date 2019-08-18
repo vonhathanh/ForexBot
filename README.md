@@ -13,7 +13,7 @@
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
 # TODO:  
-- Split data to episodes, each episode contains 1 week data, shuffle those episodes  
+- Reorganize codes  
 - Normalize reward and other input features  
 - Investigate why our win rate is 50% eventhough we did overfit the data  
 - Improve model accuracy (better reward function, more features as input to our data)  
@@ -26,6 +26,7 @@ news and then distribute it accordingly to current timeframe (halfly done)
 - Implement weight initialization  
 - Use convnet to test on non-stationary data (this can't be done right now because stable baseline convnet only accept image input)  
 # Dones
+- Split data to episodes, each episode contains 1 week data, shuffle those episodes  
 - Add more data (we are using data of year 2013 now)  
 - Create train and test data set  
 - Implement test procedure on test data set   
