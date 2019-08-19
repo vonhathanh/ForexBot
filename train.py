@@ -21,6 +21,9 @@ if __name__ == '__main__':
     parser.add_argument("--model", type=str,
                         default="lstm",
                         help="specific model to run, available models are: mlp, lstm")
+    parser.add_argument("--render", type=str,
+                        default="verbose",
+                        help="specific display mode, available models are: verbose, human")
     args = parser.parse_args()
 
     # read data and init environments
@@ -38,16 +41,18 @@ if __name__ == '__main__':
 
         model = PPO2(CustomLSTMPolicy,
                      train_env,
-                     gamma=0.98,
+                     gamma=0.99,
                      verbose=1,
                      tensorboard_log='./logs',
-                     nminibatches=1)
+                     nminibatches=1,
+                     n_steps=16)
 
     save_path = "./models/" + args.model + "_model"
 
     if args.mode == "train":
         print("Training started")
         model.learn(total_timesteps=100000, seed=69)
+        evaluate_train_set(model, train_env, 3000)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:

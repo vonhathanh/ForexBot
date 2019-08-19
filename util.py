@@ -21,27 +21,27 @@ TIME_FRAME = {
 }
 
 
-def evaluate_test_set(model, test_env, num_steps):
+def evaluate_test_set(model, test_env, num_steps, mode='verbose'):
     """evaluate model on full test set"""
     obs = test_env.reset()
     for i in range(num_steps):
         action, _states = model.predict(obs)
         obs, reward, done, info = test_env.step(action)
-        test_env.render(mode='verbose')
+        test_env.render(mode=mode)
         if done:
             test_env.reset()
 
     plot_metrics(test_env.get_attr('metrics')[0])
 
 
-def evaluate_train_set(model, train_env, num_steps):
+def evaluate_train_set(model, train_env, num_steps, mode='verbose'):
     """evaluate model on train set"""
     print("Start testing on train set (for overfitting check")
     obs = train_env.reset()
     for i in range(num_steps):
         action, _states = model.predict(obs)
         obs, reward, done, info = train_env.step(action)
-        train_env.render(mode='verbose')
+        train_env.render(mode=mode)
         if done:
             train_env.reset()
 
