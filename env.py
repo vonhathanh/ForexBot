@@ -116,7 +116,7 @@ class TradingEnv(gym.Env):
 
         self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward)
 
-        if self.steps_left == 1:
+        if self.steps_left == 0:
             self.reset_session()
             done = True
 
@@ -202,20 +202,25 @@ class LSTM_Env(TradingEnv):
     def setup_active_df(self):
         if self.serial:
             self.steps_left = len(self.df) - WINDOW_SIZE - 1
-            self.frame_start = WINDOW_SIZE
+            self.frame_start = 0
         else:
             # pick random episode index from our db
             episode_index = np.random.randint(0, len(self.episode_indices))
-            episode = self.episode_indices[episode_index]
-            # get the data we want
-            self.steps_left = episode[1] - episode[0] - WINDOW_SIZE
-            self.frame_start = episode[0]
-            self.active_df = self.df[episode[0]: episode[0] + episode[1]]
+            (start_episode, end_episode) = self.episode_indices[episode_index]
+
+            self.steps_left = end_episode - start_episode - WINDOW_SIZE - 1
+            self.frame_start = start_episode
+
+        self.active_df = self.df[self.frame_start: self.frame_start + self.steps_left + WINDOW_SIZE + 2]
 
     def reset_variables(self):
         super().reset_variables()
-        self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE + 1)
+        self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE + 1)
+
+    def reset_session(self):
+        self.setup_active_df()
+        self.reset_variables()
 
     def take_action(self, action, current_price):
         super().take_action(action, current_price)
@@ -237,6 +242,9 @@ class LSTM_Env(TradingEnv):
             self.actions[self.current_step: end],
             self.net_worth_history[self.current_step: end]
         ])
+
+        # print("obs: ", obs)
+        # print("current step: ", self.current_step)
 
         return obs
 
