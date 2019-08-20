@@ -197,7 +197,7 @@ def plot_data(input_file):
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
 
-    df['logged_and_diffed'] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
+    df['logged_and_diffed'] = ((df['Close']) - ((df['Close']).shift(1))) * 100
     df['z_norm'] = (df['Close'] - df['Close'].mean()) / df['Close'].std()
 
     plt.subplot(3, 1, 1)
@@ -349,10 +349,10 @@ def encode_time(input_file, output_file=None):
 
 def standardize_data(df, method='log_and_diff'):
     if method == 'log_and_diff':
-        df["NormedClose"] = (np.log(df['Close']) - np.log(df['Close']).shift(1)) * 100
-        df["Open"] = (np.log(df['Open']) - np.log(df['Open']).shift(1)) * 100
-        df["High"] = (np.log(df['High']) - np.log(df['High']).shift(1)) * 100
-        df["Low"] = (np.log(df['Low']) - np.log(df['Low']).shift(1)) * 100
+        df["NormedClose"] = (df['Close'] - df['Close'].shift(1)) * 100
+        df["Open"] = (df['Open'] - df['Open'].shift(1)) * 100
+        df["High"] = (df['High'] - df['High'].shift(1)) * 100
+        df["Low"] = (df['Low'] - df['Low'].shift(1)) * 100
     elif method == 'z_norm':
         scaler = StandardScaler()
         df["NormedClose"] = scaler.fit_transform(df['Close'].to_numpy().reshape((-1, 1)))
@@ -385,11 +385,22 @@ def get_episode(df):
     return true_indices
 
 
+def augmented_dickey_fuller_test(input_file):
+    from statsmodels.tsa.stattools import adfuller
+    print("Start augmented_dickey_fuller_test on data set")
+    df = pd.read_csv(input_file,
+                     sep=',', index_col=0)
+
+    df['logged_and_diffed'] = ((df['Close']) - ((df['Close']).shift(1))) * 100
+    result = adfuller(df['logged_and_diffed'].values[1:], autolag="AIC")
+    print("test result: ", result)
+
+
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
 
-    # plot_data('./data/EURUSD_m15_train.csv')
+    plot_data('./data/EURUSD_m15_train.csv')
     # metrics = {"num_step": np.linspace(1, 10),
     #            "win_trades": np.linspace(1, 10),
     #            "lose_trades": np.linspace(1, 10),
@@ -401,8 +412,9 @@ if __name__ == '__main__':
     #
     # plot_metrics(metrics)
 
-    encode_time("./data/EURUSD_m15.csv")
-    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
+    # encode_time("./data/EURUSD_m15.csv")
+    # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
+    # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
 
     pass
 

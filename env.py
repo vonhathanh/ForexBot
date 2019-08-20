@@ -13,17 +13,17 @@ LOT_SIZE = 100000
 WINDOW_SIZE = 8
 INITIAL_BALANCE = 100000
 COMISSION = 0.0001
+ACTION = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
 
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
 
     def __init__(self, df,
-                 serial=False,
-                 random=False):
+                 serial=False):
 
         super(TradingEnv, self).__init__()
-        self.df = standardize_data(df, method="z_norm").dropna().reset_index(drop=True)
+        self.df = standardize_data(df, method="log_and_diff").dropna().reset_index(drop=True)
         self.net_worth = INITIAL_BALANCE
         self.prev_net_worth = INITIAL_BALANCE
         self.usd_held = INITIAL_BALANCE
@@ -72,7 +72,6 @@ class TradingEnv(gym.Env):
             self.frame_start = np.random.randint(WINDOW_SIZE, len(self.df) - self.steps_left)
 
         self.active_df = self.df[self.frame_start - WINDOW_SIZE : self.frame_start + self.steps_left]
-
 
     def reset_session(self):
         # reset all variables that involve with the environment
@@ -138,17 +137,22 @@ class TradingEnv(gym.Env):
         elif action == 2:  # sell eur => decrease eur held, increase usd held
             self.eur_held -= amount * LOT_SIZE
             self.usd_held += amount * LOT_SIZE * sell_price
-        else:  # hold
+        # elif action == 3:
+        #     # close trade, release all eur we are holding (or buying)
+        #     self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+        #     self.eur_held = 0
+        else:
             pass
 
         self.prev_net_worth = self.net_worth
         # convert our networth to pure usd
         self.net_worth = self.usd_held + (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
 
-        if action == 1 or action == 2:
-            self.trades.append({'step': self.frame_start + self.current_step,
-                                'amount': amount,
-                                'type': "buy" if action == 1 else "sell"})
+        self.trades.append({'price': current_price,
+                            'eur_held': self.eur_held,
+                            'usd_held': self.usd_held,
+                            'net_worth': self.net_worth,
+                            'type': ACTION[action]})
 
     def render(self, mode='human'):
         if mode == 'human':
@@ -181,15 +185,14 @@ class TradingEnv(gym.Env):
 class LSTM_Env(TradingEnv):
 
     def __init__(self, df,
-                 serial=False,
-                 random=False):
-        super().__init__(df, serial, random)
+                 serial=False):
+        super().__init__(df, serial)
 
         self.episode_indices = get_episode(self.df)
 
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(10, WINDOW_SIZE + 1),
+                                             shape=(11, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.setup_active_df()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
@@ -221,7 +224,7 @@ class LSTM_Env(TradingEnv):
     def take_action(self, action, current_price):
         super().take_action(action, current_price)
         self.actions[self.current_step + WINDOW_SIZE] = action
-        self.net_worth_history[self.current_step + WINDOW_SIZE] = (self.net_worth - self.prev_net_worth) /LOT_SIZE
+        self.net_worth_history[self.current_step + WINDOW_SIZE] = (self.net_worth - self.prev_net_worth) / LOT_SIZE
 
     def next_observation(self):
         # return the next observation of the environment
@@ -231,6 +234,7 @@ class LSTM_Env(TradingEnv):
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
             self.active_df['NormedClose'].values[self.current_step: end],
+            self.active_df['Close'].values[self.current_step: end],
             self.active_df['timeEncodedX'].values[self.current_step: end],
             self.active_df['timeEncodedY'].values[self.current_step: end],
             self.active_df['dayEncodedX'].values[self.current_step: end],
@@ -238,9 +242,6 @@ class LSTM_Env(TradingEnv):
             self.actions[self.current_step: end],
             self.net_worth_history[self.current_step: end]
         ])
-
-        # print("obs: ", obs)
-        # print("current step: ", self.current_step)
 
         return obs
 
