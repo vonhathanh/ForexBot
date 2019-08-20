@@ -13,7 +13,8 @@
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
 # TODO:  
-- Reorganize codes  (hafly done)
+- Add close orders action, immediately release all eur agent is holding or selling  
+- Reorganize codes  (halfly done)
 - Normalize reward and other input features  (halfly done)
 - Setup prgressive training environment  
 - Investigate why our win rate is 50% eventhough we did overfit the data  
@@ -53,3 +54,16 @@ It also go bankrupt in 1-2000 steps later on which is the result that we expecte
 - Our objective is increase the avg win value per trade and win ratio as well as reduce the avg lose per trade  
 => First conclusion: more data is not really good for model if we don't understand and arrange the data correctly, 
 on the other hand, more training is really important in RL  
+
+- Agent sometimes buy or sell eur in agressive manner, it performs the same order in many continous steps. Which 
+is why it loses or wins an immense amount of money, but it's not really what we want.  
+- We would like the agent to control the risk-to-reward ratio that maximum drawdown is as low as possible  
+- However, it means that we won't win big amount because we don't allow the agent to invest too much in one currency  
+- This is some kind of trade-off and we rather play safe than put our capital at risk.  
+=> We need a reward function that punish agent for holding too much eur.  
+i.e. function that take into account the risk of producing high return  
+=> Our model learn to hold a numerous amount of eur in order to achieve great return.   
+However, this strategy is a double-edge sword, we could go bankrupt because of this  
+So, great rewards doesn't have to come from great returns, we could reward the agent when it wins small
+consecutive steps and not losing continously  
+
