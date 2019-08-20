@@ -52,7 +52,6 @@ if __name__ == '__main__':
     if args.mode == "train":
         print("Training started")
         model.learn(total_timesteps=100000, seed=69)
-        evaluate_train_set(model, train_env, 3000)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:

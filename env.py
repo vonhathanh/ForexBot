@@ -30,8 +30,6 @@ class TradingEnv(gym.Env):
         self.eur_held = 0
         self.current_step = 0
         self.reward = 0
-        self.action = 0
-        self.random = random
         self.serial = serial
         self.trades = []
 
@@ -100,12 +98,10 @@ class TradingEnv(gym.Env):
 
     def step(self, action):
         current_price = self.get_current_price()
-        if self.random:
-            action = np.random.randint(3)
         self.take_action(action, current_price)
         self.steps_left -= 1
         self.current_step += 1
-        self.action = action
+
         if self.prev_net_worth <= 0 or self.net_worth <= 0:
             self.reward = -5
         else:
@@ -208,10 +204,10 @@ class LSTM_Env(TradingEnv):
             episode_index = np.random.randint(0, len(self.episode_indices))
             (start_episode, end_episode) = self.episode_indices[episode_index]
 
-            self.steps_left = end_episode - start_episode - WINDOW_SIZE - 1
+            self.steps_left = end_episode - start_episode - WINDOW_SIZE
             self.frame_start = start_episode
 
-        self.active_df = self.df[self.frame_start: self.frame_start + self.steps_left + WINDOW_SIZE + 2]
+        self.active_df = self.df[self.frame_start: self.frame_start + self.steps_left + WINDOW_SIZE + 1]
 
     def reset_variables(self):
         super().reset_variables()
