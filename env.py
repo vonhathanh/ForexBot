@@ -15,6 +15,7 @@ INITIAL_BALANCE = 100000
 COMISSION = 0.0001
 ACTION = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
 
+
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
@@ -32,6 +33,7 @@ class TradingEnv(gym.Env):
         self.reward = 0
         self.serial = serial
         self.trades = []
+        self.returns = np.array([0, 0, 0, 0, 0])
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
         # action: buy, sell, hold <=> 0, 1, 2
@@ -62,6 +64,7 @@ class TradingEnv(gym.Env):
         self.usd_held = INITIAL_BALANCE
         self.eur_held = 0
         self.trades = []
+        self.returns = np.array([0, 0, 0, 0, 0])
 
     def setup_active_df(self):
         if self.serial:
@@ -96,15 +99,20 @@ class TradingEnv(gym.Env):
         return self.active_df.iloc[self.current_step].Close
 
     def step(self, action):
-        current_price = self.get_current_price()
-        self.take_action(action, current_price)
+        self.take_action(action, self.get_current_price())
         self.steps_left -= 1
         self.current_step += 1
+        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
 
         if self.prev_net_worth <= 0 or self.net_worth <= 0:
             self.reward = -5
         else:
             self.reward = np.log(self.net_worth / (self.prev_net_worth + 0.0001))
+
+        if self.returns.mean() > 0:
+            self.reward += 0.5
+        elif self.returns.mean() < 0:
+            self.reward -= 1.0
 
         obs = self.next_observation()
         done = self.net_worth <= 0
