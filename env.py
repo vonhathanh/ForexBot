@@ -19,10 +19,11 @@ ACTION = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
 class TradingEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-
-    def __init__(self, df,
-                 serial=False):
-
+    def __init__(self, df, serial=False):
+        """
+        :param df: (Pandas DataFrame) The current Dataframe we interested in
+        :param serial: (bool) Decide whether we want to split the data to multiple part or not
+        """
         super(TradingEnv, self).__init__()
         self.df = standardize_data(df, method="log_and_diff").dropna().reset_index(drop=True)
         self.net_worth = INITIAL_BALANCE
@@ -32,7 +33,9 @@ class TradingEnv(gym.Env):
         self.current_step = 0
         self.reward = 0
         self.serial = serial
+        # trade history
         self.trades = []
+        # our profit in last 5 trades
         self.returns = np.array([0, 0, 0, 0, 0])
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
@@ -40,10 +43,11 @@ class TradingEnv(gym.Env):
         # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
         # => 3 actions available
         self.action_space = spaces.Discrete(3)
-        # observe the OHCL values, networth, time, and trade history (eur held, usd held, actions)
+        # observe the OHCL values, networth, time, and trade history (eur held,
+        # usd held, actions)
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(4, WINDOW_SIZE + 1),
+                                            shape=(4, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.metrics = Metric(INITIAL_BALANCE)
         np.random.seed(69)
@@ -52,12 +56,18 @@ class TradingEnv(gym.Env):
         return self.metrics
 
     def reset(self):
-        # reset the environment and return fresh new state
+        """
+        reset the environment to a fresh new state
+        :return: (Gym.Box) new observation
+        """
         self.reset_session()
         return self.next_observation()
 
     def reset_variables(self):
-        # reset all variables that involve with the environment
+        """
+        reset all variables that involve with the environment
+        :return: None
+        """
         self.current_step = 0
         self.net_worth = INITIAL_BALANCE
         self.prev_net_worth = INITIAL_BALANCE
@@ -67,22 +77,33 @@ class TradingEnv(gym.Env):
         self.returns = np.array([0, 0, 0, 0, 0])
 
     def setup_active_df(self):
+        """
+        Determine which part of data frame will be used for training or testing
+        :return: None
+        """
         if self.serial:
             self.steps_left = len(self.df) - WINDOW_SIZE - 1
             self.frame_start = WINDOW_SIZE
         else:
             self.steps_left = np.random.randint(500, MAX_TRADING_SESSION)
-            self.frame_start = np.random.randint(WINDOW_SIZE, len(self.df) - self.steps_left)
+            self.frame_start = np.random.randint(
+                WINDOW_SIZE, len(self.df) - self.steps_left)
 
-        self.active_df = self.df[self.frame_start - WINDOW_SIZE : self.frame_start + self.steps_left]
+        self.active_df = self.df[self.frame_start - \
+            WINDOW_SIZE: self.frame_start + self.steps_left]
 
     def reset_session(self):
-        # reset all variables that involve with the environment
+        """
+        # reset all variables and setup new training session
+        :return: None
+        """
         self.reset_variables()
         self.setup_active_df()
 
     def next_observation(self):
-        # return the next observation of the environment
+        """
+        :return: (Gym.Box) the next observation of the environment
+        """
         end = self.current_step + WINDOW_SIZE + 1
 
         obs = np.array([
@@ -96,29 +117,47 @@ class TradingEnv(gym.Env):
         return obs
 
     def get_current_price(self):
+        """
+        :return: (float) closing price at time step x
+        """
         return self.active_df.iloc[self.current_step].Close
 
     def step(self, action):
+        """
+        Perform choosen action and get the response from environment
+        :param action: (int) 0 = hold, 1 = buy, 2 = sell
+        :return: tuple contains (new observation, reward, isDone, {})
+        """
+        # perform action and update utility variables
         self.take_action(action, self.get_current_price())
         self.steps_left -= 1
         self.current_step += 1
-        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
+        self.returns[self.current_step %
+                     5] = self.net_worth - self.prev_net_worth
 
+        # calculate reward
         if self.prev_net_worth <= 0 or self.net_worth <= 0:
             self.reward = -5
         else:
-            self.reward = np.log(self.net_worth / (self.prev_net_worth + 0.0001))
-
+            self.reward = np.log(
+                self.net_worth / (self.prev_net_worth + 0.0001))
         if self.returns.mean() > 0:
             self.reward += 0.5
         elif self.returns.mean() < 0:
             self.reward -= 1.0
 
+        # get next observation and check whether has finished this episode yet
         obs = self.next_observation()
         done = self.net_worth <= 0
 
-        self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward)
+        # summary training process
+        self.metrics.summary(
+            action,
+            self.net_worth,
+            self.prev_net_worth,
+            self.reward)
 
+        # reset session if we've reached the end of episode
         if self.steps_left == 0:
             self.reset_session()
             done = True
@@ -126,8 +165,15 @@ class TradingEnv(gym.Env):
         return obs, self.reward, done, {}
 
     def take_action(self, action, current_price):
+        """
+        Perform choosen action and then update our balance according to market state
+        :param action: (int) 0 = hold, 1 = buy, 2 = sell
+        :param current_price: (float) current closing price
+        :return: None
+        """
         amount = 0.5
-        # in forex, we buy with current price + comission (it's normaly 3 pip with eurusd pair)
+        # in forex, we buy with current price + comission (it's normaly 3 pip
+        # with eurusd pair)
         buy_price = current_price + COMISSION
         sell_price = current_price
 
@@ -136,7 +182,7 @@ class TradingEnv(gym.Env):
         assume comission = 3 pip = 0.0003
         => true buy price = 1.5003, sell price = 1.5
         buy 0.5 lot eur => we have 50,000 eur and (100,000 - 50,000 * 1.5003) = 24985 usd
-        => out networth: 50,000 * 1.5 + 24985 = 99985 (we lose 3 pip, 1 pip = 5 usd, 
+        => out networth: 50,000 * 1.5 + 24985 = 99985 (we lose 3 pip, 1 pip = 5 usd,
         we are using 0.5 lot as defaut, if we buy 1 lot => 1 pip = 10 usd, correct!!! )'''
         if action == 1:  # buy eur, sell usd => increase eur held, decrease usd held
             self.eur_held += amount * LOT_SIZE
@@ -154,7 +200,9 @@ class TradingEnv(gym.Env):
 
         self.prev_net_worth = self.net_worth
         # convert our networth to pure usd
-        self.net_worth = self.usd_held + (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+        # TODO: we update net worth after perfrom action, this could go wrong, need to investigate later
+        self.net_worth = self.usd_held + \
+            (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
 
         self.trades.append({'price': current_price,
                             'eur_held': self.eur_held,
@@ -165,29 +213,64 @@ class TradingEnv(gym.Env):
     def render(self, mode='human'):
         if mode == 'human':
             if not hasattr(self, 'visualization'):
-                self.visualization = StockTradingGraph(self.df, "Reward visualization")
+                self.visualization = StockTradingGraph(
+                    self.df, "Reward visualization")
             if self.current_step > WINDOW_SIZE and mode == 'human':
                 self.visualization.render(
-                    self.current_step, self.net_worth, self.reward, window_size=WINDOW_SIZE)
+                    self.current_step,
+                    self.net_worth,
+                    self.reward,
+                    window_size=WINDOW_SIZE)
 
         if self.metrics.num_step % 50 == 0:
             # save these variables for plotting
             self.metrics.update_for_plotting()
 
             print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
-            print("{:<25s}{:>5.2f}".format("Total win trades:", self.metrics.win_trades))
-            print("{:<25s}{:>5.2f}".format("Total lose trades:", self.metrics.lose_trades))
-            print("{:<25s}{:>5.2f}".format("Total hold trades:", self.metrics.hold_trades))
-            print("{:<25s}{:>5.2f}".format("Avg win value:", self.metrics.avg_win_value))
-            print("{:<25s}{:>5.2f}".format("Avg lose value:", self.metrics.avg_lose_value))
-            print("{:<25s}{:>5.2f}".format("Avg reward:", self.metrics.avg_reward / self.metrics.num_step))
-            print("{:<25s}{:>5.2f}".format("Highest net worth:", self.metrics.highest_net_worth))
-            print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.metrics.lowest_net_worth))
-            print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.metrics.most_profit_trade))
-            print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.metrics.worst_trade))
-            print("{:<25s}{:>5.2f}".format("Win ratio:", self.metrics.win_trades /
-                                           (self.metrics.lose_trades + 1 + self.metrics.win_trades)))
-            print('-'*80)
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Total win trades:",
+                    self.metrics.win_trades))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Total lose trades:",
+                    self.metrics.lose_trades))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Total hold trades:",
+                    self.metrics.hold_trades))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Avg win value:",
+                    self.metrics.avg_win_value))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Avg lose value:",
+                    self.metrics.avg_lose_value))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Avg reward:",
+                    self.metrics.avg_reward /
+                    self.metrics.num_step))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Highest net worth:",
+                    self.metrics.highest_net_worth))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Lowest net worth:",
+                    self.metrics.lowest_net_worth))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Most profit trade win:",
+                    self.metrics.most_profit_trade))
+            print(
+                "{:<25s}{:>5.2f}".format(
+                    "Worst trade lose:",
+                    self.metrics.worst_trade))
+            print("{:<25s}{:>5.2f}".format("Win ratio:", self.metrics.win_trades / \
+                  (self.metrics.lose_trades + 1 + self.metrics.win_trades)))
+            print('-' * 80)
 
 
 class LSTM_Env(TradingEnv):
@@ -200,7 +283,7 @@ class LSTM_Env(TradingEnv):
 
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                             shape=(11, WINDOW_SIZE + 1),
+                                            shape=(11, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.setup_active_df()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
@@ -218,12 +301,14 @@ class LSTM_Env(TradingEnv):
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
             self.frame_start = start_episode
 
-        self.active_df = self.df[self.frame_start: self.frame_start + self.steps_left + WINDOW_SIZE + 1]
+        self.active_df = self.df[self.frame_start: self.frame_start +
+                                 self.steps_left + WINDOW_SIZE + 1]
 
     def reset_variables(self):
         super().reset_variables()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE + 1)
-        self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE + 1)
+        self.net_worth_history = np.zeros(
+            len(self.active_df) + WINDOW_SIZE + 1)
 
     def reset_session(self):
         self.setup_active_df()
@@ -232,7 +317,8 @@ class LSTM_Env(TradingEnv):
     def take_action(self, action, current_price):
         super().take_action(action, current_price)
         self.actions[self.current_step + WINDOW_SIZE] = action
-        self.net_worth_history[self.current_step + WINDOW_SIZE] = (self.net_worth - self.prev_net_worth) / LOT_SIZE
+        self.net_worth_history[self.current_step + WINDOW_SIZE] = (
+            self.net_worth - self.prev_net_worth) / LOT_SIZE
 
     def next_observation(self):
         # return the next observation of the environment
@@ -252,6 +338,3 @@ class LSTM_Env(TradingEnv):
         ])
 
         return obs
-
-
-
