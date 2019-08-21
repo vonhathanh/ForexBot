@@ -36,12 +36,12 @@ if __name__ == '__main__':
         test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
         model = PPO2(MlpPolicy, train_env, gamma=0.95, verbose=1, tensorboard_log='./logs')
     else:
-        train_env = DummyVecEnv([lambda: LSTM_Env(train_df)])
+        train_env = DummyVecEnv([lambda: LSTM_Env(train_df, serial=True)])
         test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial=True)])
 
         model = PPO2(CustomLSTMPolicy,
                      train_env,
-                     gamma=0.99,
+                     gamma=0.90,
                      verbose=1,
                      tensorboard_log='./logs',
                      nminibatches=1,
@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     if args.mode == "train":
         print("Training started")
-        model.learn(total_timesteps=100000, seed=69)
+        model.learn(total_timesteps=200000, seed=69)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:
