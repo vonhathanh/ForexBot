@@ -12,7 +12,7 @@ MAX_TRADING_SESSION = 2000
 LOT_SIZE = 100000
 WINDOW_SIZE = 8
 INITIAL_BALANCE = 100000
-COMISSION = 0.0001
+COMISSION = 0.0002
 ACTION = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
 
 
@@ -42,7 +42,7 @@ class TradingEnv(gym.Env):
         # action: buy, sell, hold <=> 0, 1, 2
         # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
         # => 3 actions available
-        self.action_space = spaces.Discrete(3)
+        self.action_space = spaces.Discrete(4)
         # observe the OHCL values, networth, time, and trade history (eur held,
         # usd held, actions)
         self.observation_space = spaces.Box(low=-10,
@@ -139,14 +139,19 @@ class TradingEnv(gym.Env):
         if self.prev_net_worth <= 0 or self.net_worth <= 0:
             self.reward = -5
         else:
-            self.reward = np.log(
-                self.net_worth / (self.prev_net_worth + 0.0001))
-        if self.returns.mean() > 0:
-            self.reward += 0.5
-        elif self.returns.mean() < 0:
-            self.reward -= 1.0
+            if self.net_worth > self.prev_net_worth:
+                self.reward = 1
+            else:
+                self.reward = -0.5
+            if np.sum(self.returns >= 0) >= 3:
+                self.reward += 1
+            elif np.sum(self.returns < 0) >= 3:
+                self.reward -= 0.5
+            # self.reward = np.log(
+            #     self.net_worth / (self.prev_net_worth + 0.0001))
 
-        # get next observation and check whether has finished this episode yet
+
+        # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
         done = self.net_worth <= 0
 
@@ -191,16 +196,15 @@ class TradingEnv(gym.Env):
         elif action == 2:  # sell eur => decrease eur held, increase usd held
             self.eur_held -= amount * LOT_SIZE
             self.usd_held += amount * LOT_SIZE * sell_price
-        # elif action == 3:
-        #     # close trade, release all eur we are holding (or buying)
-        #     self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
-        #     self.eur_held = 0
+        elif action == 3:
+            # close trade, release all eur we are holding (or buying)
+            self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+            self.eur_held = 0
         else:
             pass
 
         self.prev_net_worth = self.net_worth
         # convert our networth to pure usd
-        # TODO: we update net worth after perfrom action, this could go wrong, need to investigate later
         self.net_worth = self.usd_held + \
             (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
 
@@ -227,49 +231,17 @@ class TradingEnv(gym.Env):
             self.metrics.update_for_plotting()
 
             print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Total win trades:",
-                    self.metrics.win_trades))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Total lose trades:",
-                    self.metrics.lose_trades))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Total hold trades:",
-                    self.metrics.hold_trades))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Avg win value:",
-                    self.metrics.avg_win_value))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Avg lose value:",
-                    self.metrics.avg_lose_value))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Avg reward:",
-                    self.metrics.avg_reward /
-                    self.metrics.num_step))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Highest net worth:",
-                    self.metrics.highest_net_worth))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Lowest net worth:",
-                    self.metrics.lowest_net_worth))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Most profit trade win:",
-                    self.metrics.most_profit_trade))
-            print(
-                "{:<25s}{:>5.2f}".format(
-                    "Worst trade lose:",
-                    self.metrics.worst_trade))
-            print("{:<25s}{:>5.2f}".format("Win ratio:", self.metrics.win_trades / \
-                  (self.metrics.lose_trades + 1 + self.metrics.win_trades)))
+            print("{:<25s}{:>5.2f}".format("Total win trades:", self.metrics.win_trades))
+            print("{:<25s}{:>5.2f}".format("Total lose trades:", self.metrics.lose_trades))
+            print("{:<25s}{:>5.2f}".format("Total hold trades:", self.metrics.hold_trades))
+            print("{:<25s}{:>5.2f}".format("Avg win value:", self.metrics.avg_win_value))
+            print("{:<25s}{:>5.2f}".format("Avg lose value:", self.metrics.avg_lose_value))
+            print("{:<25s}{:>5.2f}".format("Avg reward:", self.metrics.avg_reward / self.metrics.num_step))
+            print("{:<25s}{:>5.2f}".format("Highest net worth:", self.metrics.highest_net_worth))
+            print("{:<25s}{:>5.2f}".format("Lowest net worth:", self.metrics.lowest_net_worth))
+            print("{:<25s}{:>5.2f}".format("Most profit trade win:", self.metrics.most_profit_trade))
+            print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.metrics.worst_trade))
+            print("{:<25s}{:>5.2f}".format("Win ratio:", self.metrics.win_trades / (self.metrics.lose_trades + 1 + self.metrics.win_trades)))
             print('-' * 80)
 
 
@@ -295,7 +267,7 @@ class LSTM_Env(TradingEnv):
             self.frame_start = 0
         else:
             # pick random episode index from our db
-            episode_index = np.random.randint(0, len(self.episode_indices))
+            episode_index = np.random.randint(0, 5)
             (start_episode, end_episode) = self.episode_indices[episode_index]
 
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
