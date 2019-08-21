@@ -22,7 +22,6 @@ class Metric:
                         "worst_trade": [],
                         "net_worth": [],}
 
-
     def summary(self, action, net_worth, prev_net_worth, reward):
         profit = net_worth - prev_net_worth
         self.num_step += 1
@@ -30,13 +29,13 @@ class Metric:
 
         if action == 0:
             self.hold_trades += 1
-        else:
-            if net_worth < prev_net_worth:
-                self.lose_trades += 1
-                self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
-            elif net_worth > prev_net_worth:
-                self.win_trades += 1
-                self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
+
+        if net_worth < prev_net_worth:
+            self.lose_trades += 1
+            self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
+        elif net_worth > prev_net_worth:
+            self.win_trades += 1
+            self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
 
         self.avg_reward += reward
 
@@ -44,7 +43,6 @@ class Metric:
         self.lowest_net_worth = min(net_worth, self.lowest_net_worth)
         self.most_profit_trade = max(profit, self.most_profit_trade)
         self.worst_trade = min(profit, self.worst_trade)
-
 
     def update_for_plotting(self):
         self.metrics["num_step"].append(self.num_step)

@@ -197,7 +197,9 @@ def plot_data(input_file):
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
 
-    df['logged_and_diffed'] = ((df['Close']) - ((df['Close']).shift(1))) * 100
+    df['logged_and_diffed'] = abs(((df['Close']) - ((df['Close']).shift(1))))
+    print("quantile: ", df["logged_and_diffed"].quantile(0.9))
+    print(round(df["logged_and_diffed"].mean(), 5))
     df['z_norm'] = (df['Close'] - df['Close'].mean()) / df['Close'].std()
 
     plt.subplot(3, 1, 1)
