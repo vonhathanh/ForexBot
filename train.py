@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     if args.mode == "train":
         print("Training started")
-        model.learn(total_timesteps=200000, seed=69)
+        model.learn(total_timesteps=300000, seed=69)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:

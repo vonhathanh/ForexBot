@@ -147,9 +147,6 @@ class TradingEnv(gym.Env):
                 self.reward += 1
             elif np.sum(self.returns < 0) >= 3:
                 self.reward -= 0.5
-            # self.reward = np.log(
-            #     self.net_worth / (self.prev_net_worth + 0.0001))
-
 
         # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
@@ -251,6 +248,8 @@ class LSTM_Env(TradingEnv):
                  serial=False):
         super().__init__(df, serial)
 
+        self.num_epoch = 1
+
         self.episode_indices = get_episode(self.df)
 
         self.observation_space = spaces.Box(low=-10,
@@ -267,7 +266,7 @@ class LSTM_Env(TradingEnv):
             self.frame_start = 0
         else:
             # pick random episode index from our db
-            episode_index = np.random.randint(0, 5)
+            episode_index = np.random.randint(0, self.num_epoch * 8 + 1)
             (start_episode, end_episode) = self.episode_indices[episode_index]
 
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
@@ -291,6 +290,9 @@ class LSTM_Env(TradingEnv):
         self.actions[self.current_step + WINDOW_SIZE] = action
         self.net_worth_history[self.current_step + WINDOW_SIZE] = (
             self.net_worth - self.prev_net_worth) / LOT_SIZE
+        # increase training data after one epoch
+        if self.metrics.num_step % 100000 == 0 and self.metrics.num_step > 0:
+            self.num_epoch += 1
 
     def next_observation(self):
         # return the next observation of the environment
