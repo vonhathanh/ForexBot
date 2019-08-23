@@ -44,6 +44,7 @@ train it incorrectly)
 - Overfit one batch of dataset to test model ability  
 - Implement save and restore model functionality  
 # Notes:  
+- MT4 time zone: UTC+3, history calendar time zone: UTC-4, our data timezone: UTC-5  
 - Setup end-to-end training/evalution skeleton first + get dump baselines.  
 - Fix random seed, start simple first, don't add too many features to our model
 - Complexity only one at a time (plug signal in one by one)
