@@ -44,10 +44,11 @@ train it incorrectly)
 - Overfit one batch of dataset to test model ability  
 - Implement save and restore model functionality  
 # Notes:  
+- Price changes dramatically in 15 mins before and 1h mins after critical news  
 - MT4 time zone: UTC+3, history calendar time zone: UTC-4, our data timezone: UTC-5  
 - Setup end-to-end training/evalution skeleton first + get dump baselines.  
 - Fix random seed, start simple first, don't add too many features to our model
-- Complexity only one at a time (plug signal in one by one)
+- Complexity only one at a time (plug signal in one by one)  
 - M15 time frame data contains about 200k records, we may want to switch to smaller time frame for more data  
 - Right now we have reduced the spread to 0.1, in reality the spread will be 0.3 or higher,  
 we need to test it against higher spread  
