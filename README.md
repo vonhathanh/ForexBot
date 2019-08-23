@@ -16,7 +16,7 @@
 - Win/lose percent of agent, our target is 70-80% (current rate: 50-60%)
 - Risk to reward ratio, target is 1:4 (the best we've achieved so far is 1:3)
 - Maximum drawdown <= 0.1% of current balance (done)
-- Avg win value > 0.5% is prefered
+- Avg win value > 0.5% current balance or 40 pip is prefered
 # TODO:  
 - Reorganize codes  (halfly done)
 - Normalize reward and other input features  (halfly done)
