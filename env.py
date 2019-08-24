@@ -8,16 +8,22 @@ from gym import spaces
 from util import standardize_data, get_episode
 from metrics import Metric
 
+# a trading session is a fragment of training data
+# when we've finished training agent in a session, we move on to another one (different fragment)
+# this variable determined maximum time allowed in a session
 MAX_TRADING_SESSION = 2000
+# 1 lot in forex equal to 100000 usd
 LOT_SIZE = 100000
+# look back window, agent will use this to know what happended in the past 8 time frame
 WINDOW_SIZE = 8
-INITIAL_BALANCE = 100000
+# comission when we making a trade
 COMISSION = 0.0002
-ACTION = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
+
+INITIAL_BALANCE = 100000
+ACTIONS = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
 
 
 class TradingEnv(gym.Env):
-    metadata = {'render.modes': ['human']}
 
     def __init__(self, df, serial=False):
         """
@@ -39,9 +45,9 @@ class TradingEnv(gym.Env):
         self.returns = np.array([0, 0, 0, 0, 0])
 
         # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
-        # action: buy, sell, hold <=> 0, 1, 2
+        # action: buy, sell, hold, close <=> 0, 1, 2, 3
         # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
-        # => 3 actions available
+        # => 4 actions available
         self.action_space = spaces.Discrete(4)
         # observe the OHCL values, networth, time, and trade history (eur held,
         # usd held, actions)
@@ -209,24 +215,31 @@ class TradingEnv(gym.Env):
                             'eur_held': self.eur_held,
                             'usd_held': self.usd_held,
                             'net_worth': self.net_worth,
-                            'type': ACTION[action]})
+                            'type': ACTIONS[action]})
 
     def render(self, mode='human'):
+        """
+        show information about trainin process
+        :param mode: (string) if human mode is selected, display a additional
+            graph that visualize trades, net worth, prices...
+        :return: None
+        """
         if mode == 'human':
+            # init graph
             if not hasattr(self, 'visualization'):
                 self.visualization = StockTradingGraph(
                     self.df, "Reward visualization")
+            # render it if we have enough information
             if self.current_step > WINDOW_SIZE and mode == 'human':
                 self.visualization.render(
                     self.current_step,
                     self.net_worth,
                     self.reward,
                     window_size=WINDOW_SIZE)
-
+        # print out some statistic about agent
         if self.metrics.num_step % 50 == 0:
             # save these variables for plotting
             self.metrics.update_for_plotting()
-
             print("{:<25s}{:>5.2f}".format("current step:", self.current_step))
             print("{:<25s}{:>5.2f}".format("Total win trades:", self.metrics.win_trades))
             print("{:<25s}{:>5.2f}".format("Total lose trades:", self.metrics.lose_trades))
@@ -242,16 +255,20 @@ class TradingEnv(gym.Env):
             print('-' * 80)
 
 
+# env that use lstm architecture to train the model
 class LSTM_Env(TradingEnv):
 
     def __init__(self, df,
                  serial=False):
         super().__init__(df, serial)
-
-        self.num_epoch = 1
-
+        # epoch counter, for each epoch passed (about 100k steps),
+        # we will increase the epoch and add 8 more weeks to training data
+        self.current_epoch = 1
+        # index of current episode ( 1 episode equivalent to 1 week of trading)
         self.episode_indices = get_episode(self.df)
-
+        # observation space, includes: OLHC prices (normalized), close price (unnormalized),
+        # time in minutes(encoded), day of week(encoded), action history, net worth changes history
+        # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
                                             shape=(11, WINDOW_SIZE + 1),
@@ -261,14 +278,19 @@ class LSTM_Env(TradingEnv):
         self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
 
     def setup_active_df(self):
+        """
+        select fragment of data we will use to train agent in this epoch
+        :return: None
+        """
+        # if serial mode is enabled, we traverse through training data from 2012->2019
+        # else we'll just jumping randomly betweek these times
         if self.serial:
             self.steps_left = len(self.df) - WINDOW_SIZE - 1
             self.frame_start = 0
         else:
             # pick random episode index from our db
-            episode_index = np.random.randint(0, self.num_epoch * 8 + 1)
+            episode_index = np.random.randint(0, self.current_epoch * 8 + 1)
             (start_episode, end_episode) = self.episode_indices[episode_index]
-
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
             self.frame_start = start_episode
 
@@ -287,12 +309,13 @@ class LSTM_Env(TradingEnv):
 
     def take_action(self, action, current_price):
         super().take_action(action, current_price)
+        # save these variables for training
         self.actions[self.current_step + WINDOW_SIZE] = action
         self.net_worth_history[self.current_step + WINDOW_SIZE] = (
             self.net_worth - self.prev_net_worth) / LOT_SIZE
         # increase training data after one epoch
         if self.metrics.num_step % 100000 == 0 and self.metrics.num_step > 0:
-            self.num_epoch += 1
+            self.current_epoch += 1
 
     def next_observation(self):
         # return the next observation of the environment
