@@ -31,8 +31,8 @@ news and then distribute it accordingly to current timeframe (halfly done)
 - Use convnet to test on non-stationary data (this can't be done right now because stable baseline convnet only accept image input)  
 # Dones
 - Investigate why our win rate is 50% eventhough we did overfit the data  (done, mostly because we 
-train it incorrectly)
-- Setup progressive training environment  (done)
+train it incorrectly)  
+- Setup progressive training environment  
 - Add close orders action, immediately release all eur agent is holding or selling  
 - Split data to episodes, each episode contains 1 week data, shuffle those episodes  
 - Add more data (we are using data of year 2013 now)  

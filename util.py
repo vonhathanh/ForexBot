@@ -5,6 +5,7 @@ import numpy as np
 import time
 
 from datetime import datetime
+from html_parser import ForexNewsParser
 
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
 from sklearn.preprocessing import StandardScaler
@@ -368,7 +369,6 @@ def standardize_data(df, method='log_and_diff'):
 
 def get_episode(df):
     # get indices of episode in data frame, each episode is one week data
-
     def get_end_week_indices(row):
         # get index of one week trading session,
         # weekend at day = 4 (thursday and time = 16:45
@@ -398,11 +398,53 @@ def augmented_dickey_fuller_test(input_file):
     print("test result: ", result)
 
 
+def insert_economical_news_feature(input_file, html_file, output_file=None):
+    """
+    insert feature indicates that agent is in a high risk state
+    (ecomical news is going to be announced)
+    :param output_file: (string) output file name and path
+    :param html_file: (string) path to html file contains economic calendar
+    :param input_file: (string) path to input csv file
+    :return: None
+    """
+    df = pd.read_csv(input_file,
+                     sep=',', index_col=0)
+    df["HighRiskTime"] = 0
+    # read and parse the html to get dates have economical news announced
+    print("Start insert economical news feature to dataset")
+    with open(html_file, 'r', encoding='utf-8') as f:
+        html_raw = f.read()
+    parser = ForexNewsParser()
+    parser.feed(html_raw)
+    # sort dates is ascending order, replace "/" by "." to match with training data
+    dates = sorted(parser.dates)
+    dates = list(map(lambda x: x.replace("/", ".")[:-3], dates))
+
+    # if both day and time match between the dataset and calendar
+    # we set highrisktime = 1
+    t = 0
+    for i in range(len(df)):
+        # date format is yyyy.dd.mm  hh:mm, we split it to day and time
+        data = dates[t].split(" ")
+        day = data[0]
+        time = data[1]
+        # compare day time between two data sets
+        if df.iat[i, 0] == day and df.iat[i, 1] == time:
+            df.HighRiskTime[i-1:i+5] =  1
+        # increase economical calender index by one if we have passed the day event occur
+        elif df.iat[i, 0] > day:
+            t += 1
+
+    save_file(df, input_file, output_file)
+    print("insert successfully")
+
+
+
 if __name__ == '__main__':
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
     # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
 
-    plot_data('./data/EURUSD_m15_train.csv')
+    # plot_data('./data/EURUSD_m15_train.csv')
     # metrics = {"num_step": np.linspace(1, 10),
     #            "win_trades": np.linspace(1, 10),
     #            "lose_trades": np.linspace(1, 10),
@@ -415,8 +457,10 @@ if __name__ == '__main__':
     # plot_metrics(metrics)
 
     # encode_time("./data/EURUSD_m15.csv")
-    # split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
+
     # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
+    insert_economical_news_feature("./data/EURUSD_m15.csv", "./data/Economic Calendar - Investing.com.html")
+    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
 
     pass
 
