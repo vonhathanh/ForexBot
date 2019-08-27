@@ -21,6 +21,10 @@ TIME_FRAME = {
     'w1': 60*24*7,
 }
 
+FULL_DATA_FILE = './data/EURUSD_m15.csv'
+TRAIN_FILE = './data/EURUSD_m15_train.csv'
+TEST_FILE = './data/EURUSD_m15_test.csv'
+
 
 def evaluate_test_set(model, test_env, num_steps, mode='verbose'):
     """evaluate model on full test set"""
@@ -330,8 +334,8 @@ def encode_time(input_file, output_file=None):
     print("Start encode time")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
-    df["dayOfWeek"] = pd.to_datetime(df['DayOfYear'])
-    df["dayOfWeek"] = df.dayOfWeek.apply(lambda x: x.dayofweek)
+    df["DayOfWeek"] = pd.to_datetime(df['DayOfYear'])
+    df["DayOfWeek"] = df.DayOfWeek.apply(lambda x: x.dayofweek)
 
     def encode(x):
         hour = int(x[0:2])
@@ -339,12 +343,12 @@ def encode_time(input_file, output_file=None):
         current_time = hour * 60 + minute
         return current_time
 
-    df['timeInMinute'] = df['Time'].apply(lambda x: encode(x))
-    df['timeEncodedX'] = np.sin(2 * np.pi * df.timeInMinute / 1425)
-    df['timeEncodedY'] = np.cos(2 * np.pi * df.timeInMinute / 1425)
-    df['dayEncodedX'] = np.sin(2 * np.pi * df.dayOfWeek / 5)
-    df['dayEncodedY'] = np.cos(2 * np.pi * df.dayOfWeek / 5)
-    df.drop(["timeInMinute"], axis=1, inplace=True)
+    df['TimeInMinute'] = df['Time'].apply(lambda x: encode(x))
+    df['TimeEncodedX'] = np.sin(2 * np.pi * df.TimeInMinute / 1425)
+    df['TimeEncodedY'] = np.cos(2 * np.pi * df.TimeInMinute / 1425)
+    df['DayEncodedX'] = np.sin(2 * np.pi * df.DayOfWeek / 5)
+    df['DayEncodedY'] = np.cos(2 * np.pi * df.DayOfWeek / 5)
+    df.drop(["TimeInMinute"], axis=1, inplace=True)
 
     save_file(df, input_file, output_file)
     print("encode time complete!")
@@ -372,7 +376,7 @@ def get_episode(df):
     def get_end_week_indices(row):
         # get index of one week trading session,
         # weekend at day = 4 (thursday and time = 16:45
-        if row.dayOfWeek == 4 and row.Time == "16:45":
+        if row.DayOfWeek == 4 and row.Time == "16:45":
             return row.name
         return -1
 
@@ -416,7 +420,7 @@ def insert_economical_news_feature(input_file, html_file, output_file=None):
         html_raw = f.read()
     parser = ForexNewsParser()
     parser.feed(html_raw)
-    # sort dates is ascending order, replace "/" by "." to match with training data
+    # sort dates in ascending order, replace "/" by "." to match with training data
     dates = sorted(parser.dates)
     dates = list(map(lambda x: x.replace("/", ".")[:-3], dates))
 
@@ -429,8 +433,11 @@ def insert_economical_news_feature(input_file, html_file, output_file=None):
         day = data[0]
         time = data[1]
         # compare day time between two data sets
+
         if df.iat[i, 0] == day and df.iat[i, 1] == time:
-            df.HighRiskTime[i-1:i+5] =  1
+            print(df.iat[i, 0], " ", df.iat[i, 1])
+            df.HighRiskTime[i-1:i+5] = 1
+            t += 1
         # increase economical calender index by one if we have passed the day event occur
         elif df.iat[i, 0] > day:
             t += 1
@@ -456,11 +463,11 @@ if __name__ == '__main__':
     #
     # plot_metrics(metrics)
 
-    # encode_time("./data/EURUSD_m15.csv")
+    encode_time("./data/EURUSD_m15.csv")
 
     # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
-    insert_economical_news_feature("./data/EURUSD_m15.csv", "./data/Economic Calendar - Investing.com.html")
-    split_dataset("./data/EURUSD_m15.csv", split_ratio=0.9)
+    insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
+    split_dataset(FULL_DATA_FILE, split_ratio=0.9)
 
     pass
 

@@ -1,7 +1,7 @@
 import argparse
 import pandas as pd
 
-from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy
+from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
 from util import evaluate_train_set, evaluate_test_set
@@ -30,14 +30,17 @@ if __name__ == '__main__':
     train_df = pd.read_csv('./data/EURUSD_m15_train.csv', index_col=0)
     test_df = pd.read_csv('./data/EURUSD_m15_test.csv', index_col=0)
     # The algorithms require a vectorized environment to run
+    serial = False
+    if args.mode == "test":
+        serial = True
 
     if args.model == 'mlp':
-        train_env = DummyVecEnv([lambda: TradingEnv(train_df)])
-        test_env = DummyVecEnv([lambda: TradingEnv(test_df, serial=True)])
+        train_env = DummyVecEnv([lambda: TradingEnv(train_df, serial)])
+        test_env = DummyVecEnv([lambda: TradingEnv(test_df,serial)])
         model = PPO2(MlpPolicy, train_env, gamma=0.95, verbose=1, tensorboard_log='./logs')
     else:
-        train_env = DummyVecEnv([lambda: LSTM_Env(train_df, serial=True)])
-        test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial=True)])
+        train_env = DummyVecEnv([lambda: LSTM_Env(train_df, serial)])
+        test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial)])
 
         model = PPO2(CustomLSTMPolicy,
                      train_env,
@@ -53,7 +56,7 @@ if __name__ == '__main__':
 
     if args.mode == "train":
         print("Training started")
-        model.learn(total_timesteps=300000, seed=69)
+        model.learn(total_timesteps=200000, seed=69)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:

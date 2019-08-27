@@ -271,7 +271,7 @@ class LSTM_Env(TradingEnv):
         # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(11, WINDOW_SIZE + 1),
+                                            shape=(12, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.setup_active_df()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
@@ -289,7 +289,7 @@ class LSTM_Env(TradingEnv):
             self.frame_start = 0
         else:
             # pick random episode index from our db
-            episode_index = np.random.randint(0, self.current_epoch * 8 + 1)
+            episode_index = np.random.randint(0, self.current_epoch * 8)
             (start_episode, end_episode) = self.episode_indices[episode_index]
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
             self.frame_start = start_episode
@@ -326,10 +326,11 @@ class LSTM_Env(TradingEnv):
             self.active_df['Low'].values[self.current_step: end],
             self.active_df['NormedClose'].values[self.current_step: end],
             self.active_df['Close'].values[self.current_step: end],
-            self.active_df['timeEncodedX'].values[self.current_step: end],
-            self.active_df['timeEncodedY'].values[self.current_step: end],
-            self.active_df['dayEncodedX'].values[self.current_step: end],
-            self.active_df['dayEncodedY'].values[self.current_step: end],
+            self.active_df['TimeEncodedX'].values[self.current_step: end],
+            self.active_df['TimeEncodedY'].values[self.current_step: end],
+            self.active_df['DayEncodedX'].values[self.current_step: end],
+            self.active_df['DayEncodedY'].values[self.current_step: end],
+            self.active_df['HighRiskTime'].values[self.current_step: end],
             self.actions[self.current_step: end],
             self.net_worth_history[self.current_step: end]
         ])
