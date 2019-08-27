@@ -18,11 +18,8 @@
 - Maximum drawdown <= 0.1% of current balance (done)
 - Avg win value > 0.5% current balance or 40 pip is prefered
 # TODO:  
-- Reorganize codes  (halfly done)
-- Normalize reward and other input features  (halfly done)
-- Improve model accuracy (better reward function, more features as input to our data)  (doing)
-- Using news data as feature, we must calculate avg time the market is affected by 
-news and then distribute it accordingly to current timeframe (halfly done)  
+- Reorganize codes (halfly done)  
+- Improve model accuracy (better reward function, more features as input to our data) (doing)  
 - Display trade history   
 - Make action space more diversity  
 - Write unit test  
@@ -30,6 +27,9 @@ news and then distribute it accordingly to current timeframe (halfly done)
 - Implement weight initialization  
 - Use convnet to test on non-stationary data (this can't be done right now because stable baseline convnet only accept image input)  
 # Dones
+- Normalize reward and other input features (done)
+- Using news data as feature, we must calculate avg time the market is affected by 
+news and then distribute it accordingly to current timeframe (done)  
 - Investigate why our win rate is 50% eventhough we did overfit the data  (done, mostly because we 
 train it incorrectly)  
 - Setup progressive training environment  
