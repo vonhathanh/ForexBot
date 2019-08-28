@@ -20,7 +20,7 @@ class Metric:
                         "avg_reward": [],
                         "most_profit_trade": [],
                         "worst_trade": [],
-                        "net_worth": [],}
+                        "net_worth": []}
 
     def summary(self, action, net_worth, prev_net_worth, reward):
         profit = net_worth - prev_net_worth

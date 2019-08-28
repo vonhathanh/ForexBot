@@ -1,3 +1,4 @@
+import plotly.graph_objects as go
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -445,6 +446,27 @@ def insert_economical_news_feature(input_file, html_file, output_file=None):
     save_file(df, input_file, output_file)
     print("insert successfully")
 
+
+def show_candles_chart(input_file, start, period=100):
+    """
+    show OHLC price in candle shape
+    :param input_file: (string) file name we want to read from
+    :param start: (int) index of specific point in time we want to show
+    :param period: (int) we normally want to see candles from start to start + period of time
+    :return: None
+    """
+    end = start + period
+    df = pd.read_csv(input_file)
+    df["DayOfYear"] = df["DayOfYear"] + " " + df["Time"] + ":00"
+    df["DayOfYear"] = df["DayOfYear"].apply(lambda x: str(x).replace(".", "-"))
+
+    fig = go.Figure(data=[go.Candlestick(x=df["DayOfYear"][start: end],
+                                         open=df['Open'][start: end],
+                                         high=df['High'][start: end],
+                                         low=df['Low'][start: end],
+                                         close=df['Close'][start: end])])
+
+    fig.show()
 
 
 if __name__ == '__main__':

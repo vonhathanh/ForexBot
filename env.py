@@ -1,8 +1,7 @@
 import gym
 import numpy as np
-import pandas as pd
+import ta
 
-from sklearn.preprocessing import StandardScaler
 from trading_graph import StockTradingGraph
 from gym import spaces
 from util import standardize_data, get_episode
@@ -320,6 +319,13 @@ class LSTM_Env(TradingEnv):
     def next_observation(self):
         # return the next observation of the environment
         end = self.current_step + WINDOW_SIZE + 1
+
+        atr = ta.average_true_range(self.active_df.High[self.current_step: end] * 100,
+                                    self.active_df.Low[self.current_step: end] * 100,
+                                    self.active_df.Close[self.current_step: end] * 100, n=9, fillna=True).to_numpy()
+        macd = ta.macd(self.active_df.Close[self.current_step: end] * 200, n_fast=9, n_slow=9, fillna=True).to_numpy()
+        rsi = ta.rsi(self.active_df.Close[self.current_step: end] / 100, fillna=True, n=9).to_numpy()
+
         obs = np.array([
             self.active_df['Open'].values[self.current_step: end],
             self.active_df['High'].values[self.current_step: end],
@@ -332,7 +338,10 @@ class LSTM_Env(TradingEnv):
             self.active_df['DayEncodedY'].values[self.current_step: end],
             self.active_df['HighRiskTime'].values[self.current_step: end],
             self.actions[self.current_step: end],
-            self.net_worth_history[self.current_step: end]
+            self.net_worth_history[self.current_step: end],
+            # atr,
+            # macd,
+            # rsi
         ])
 
         return obs
