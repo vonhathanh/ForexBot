@@ -6,7 +6,7 @@ from trading_graph import StockTradingGraph
 from gym import spaces
 from util import standardize_data, get_episode
 from metrics import Metric
-
+from enum import Enum
 # a trading session is a fragment of training data
 # when we've finished training agent in a session, we move on to another one (different fragment)
 # this variable determined maximum time allowed in a session
@@ -19,7 +19,14 @@ WINDOW_SIZE = 8
 COMISSION = 0.0002
 
 INITIAL_BALANCE = 100000
-ACTIONS = {0: "hold", 1: "buy", 2: "sell", 3: "close"}
+ACTIONS = {0: "hold", 1: "buy", 2: "sell", 3: "close", 4: "close_and_buy", 5: "close_and_sell"}
+
+HOLD = 0
+BUY = 1
+SELL = 2
+CLOSE = 3
+CLOSE_AND_BUY = 4
+CLOSE_AND_SELL = 5
 
 
 class TradingEnv(gym.Env):
@@ -47,7 +54,7 @@ class TradingEnv(gym.Env):
         # action: buy, sell, hold, close <=> 0, 1, 2, 3
         # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
         # => 4 actions available
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(6)
         # observe the OHCL values, networth, time, and trade history (eur held,
         # usd held, actions)
         self.observation_space = spaces.Box(low=-10,
@@ -147,11 +154,11 @@ class TradingEnv(gym.Env):
             if self.net_worth > self.prev_net_worth:
                 self.reward = 1
             else:
-                self.reward = -0.5
+                self.reward = -1
             if np.sum(self.returns >= 0) >= 3:
                 self.reward += 1
             elif np.sum(self.returns < 0) >= 3:
-                self.reward -= 0.5
+                self.reward -= 1
 
         # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
@@ -191,19 +198,43 @@ class TradingEnv(gym.Env):
         buy 0.5 lot eur => we have 50,000 eur and (100,000 - 50,000 * 1.5003) = 24985 usd
         => out networth: 50,000 * 1.5 + 24985 = 99985 (we lose 3 pip, 1 pip = 5 usd,
         we are using 0.5 lot as defaut, if we buy 1 lot => 1 pip = 10 usd, correct!!! )'''
-        if action == 1:  # buy eur, sell usd => increase eur held, decrease usd held
-            self.eur_held += amount * LOT_SIZE
-            self.usd_held -= amount * LOT_SIZE * buy_price
-
-        elif action == 2:  # sell eur => decrease eur held, increase usd held
-            self.eur_held -= amount * LOT_SIZE
-            self.usd_held += amount * LOT_SIZE * sell_price
-        elif action == 3:
+        if action == CLOSE_AND_BUY:  # buy eur
+            # if we are go long (holding eur in positive amount), increase it
+            if self.eur_held >= 0:
+                self.eur_held += amount * LOT_SIZE
+                self.usd_held -= amount * LOT_SIZE * buy_price
+            # otherwise, we are go short (holding eur in negative amount),
+            # reset the amount of eur we're holding by convert all eur to usd
+            # buy some eur
+            else:
+                self.usd_held += self.eur_held * buy_price
+                self.eur_held = amount * LOT_SIZE
+                self.usd_held -= amount * LOT_SIZE * buy_price
+        elif action == CLOSE_AND_SELL:  # sell eur
+            # if we are go long (holding eur in positive amount)
+            # reset the amount of eur we're holding by convert all eur to usd
+            # sell some eur
+            if self.eur_held >= 0:
+                self.usd_held += self.eur_held * sell_price
+                self.eur_held = -amount * LOT_SIZE
+                self.usd_held += amount * LOT_SIZE * sell_price
+            # otherwise, we are go short (holding eur in negative amount), decrease it
+            else:
+                self.eur_held -= amount * LOT_SIZE
+                self.usd_held += amount * LOT_SIZE * sell_price
+        elif action == CLOSE:
             # close trade, release all eur we are holding (or buying)
             self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
             self.eur_held = 0
+        elif action == BUY:
+            self.eur_held += amount * LOT_SIZE
+            self.usd_held -= amount * LOT_SIZE * buy_price
+        elif action == SELL:
+            self.eur_held -= amount * LOT_SIZE
+            self.usd_held += amount * LOT_SIZE * sell_price
         else:
             pass
+
 
         self.prev_net_worth = self.net_worth
         # convert our networth to pure usd
@@ -320,11 +351,11 @@ class LSTM_Env(TradingEnv):
         # return the next observation of the environment
         end = self.current_step + WINDOW_SIZE + 1
 
-        atr = ta.average_true_range(self.active_df.High[self.current_step: end] * 100,
-                                    self.active_df.Low[self.current_step: end] * 100,
-                                    self.active_df.Close[self.current_step: end] * 100, n=9, fillna=True).to_numpy()
-        macd = ta.macd(self.active_df.Close[self.current_step: end] * 200, n_fast=9, n_slow=9, fillna=True).to_numpy()
-        rsi = ta.rsi(self.active_df.Close[self.current_step: end] / 100, fillna=True, n=9).to_numpy()
+        # atr = ta.average_true_range(self.active_df.High[self.current_step: end] * 100,
+        #                             self.active_df.Low[self.current_step: end] * 100,
+        #                             self.active_df.Close[self.current_step: end] * 100, n=9, fillna=True).to_numpy()
+        # macd = ta.macd(self.active_df.Close[self.current_step: end] * 200, n_fast=9, n_slow=9, fillna=True).to_numpy()
+        # rsi = ta.rsi(self.active_df.Close[self.current_step: end] / 100, fillna=True, n=9).to_numpy()
 
         obs = np.array([
             self.active_df['Open'].values[self.current_step: end],
