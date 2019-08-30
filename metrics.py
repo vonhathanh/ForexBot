@@ -30,7 +30,7 @@ class Metric:
         if action == 0:
             self.hold_trades += 1
 
-        if net_worth < prev_net_worth:
+        if net_worth + 10 < prev_net_worth:
             self.lose_trades += 1
             self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
         elif net_worth > prev_net_worth:

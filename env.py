@@ -145,33 +145,44 @@ class TradingEnv(gym.Env):
         """
         :return: (float) closing price at time step x
         """
-        return self.active_df.iloc[self.current_step].Close
+        return self.active_df.iloc[self.current_step + WINDOW_SIZE].Close
 
     def step(self, action):
         """
         Perform choosen action and get the response from environment
-        :param action: (int) 0 = hold, 1 = buy, 2 = sell
+        :param action: (int) 0 = hold, 1 = buy, 2 = sell, 3 = close, 4 = close and buy, 5 = close and sell
         :return: tuple contains (new observation, reward, isDone, {})
         """
         # perform action and update utility variables
         self.take_action(action, self.get_current_price())
         self.steps_left -= 1
         self.current_step += 1
-        self.returns[self.current_step %
-                     5] = self.net_worth - self.prev_net_worth
+        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
 
         # calculate reward
-        if self.prev_net_worth <= 0 or self.net_worth <= 0:
-            self.reward = -5
+        if self.prev_net_worth + 10 <= self.net_worth:
+            self.reward = 1
         else:
-            if self.net_worth > self.prev_net_worth:
-                self.reward = 1
-            else:
-                self.reward = -1
-            if np.sum(self.returns >= 0) >= 3:
-                self.reward += 1
-            elif np.sum(self.returns < 0) >= 3:
-                self.reward -= 1
+            self.reward = -1
+        if np.sum(self.returns >= 0) >= 3:
+            self.reward += 0.5
+
+
+        # if self.prev_net_worth <= 0 or self.net_worth <= 0:
+        #     self.reward = -5
+        # else:
+        #     if self.net_worth > self.prev_net_worth:
+        #         self.reward = 1
+        #     else:
+        #         self.reward = -1
+        #     if np.sum(self.returns >= 0) >= 3:
+        #         self.reward += 3
+        #     elif np.sum(self.returns < 0) >= 3:
+        #         self.reward -= 5
+        #     if np.sum(self.returns) > 100:
+        #         self.reward += 3
+        #     elif np.sum(self.returns) < -100:
+        #         self.reward -= 5
 
         # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
@@ -313,7 +324,7 @@ class LSTM_Env(TradingEnv):
         # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(14, WINDOW_SIZE + 1),
+                                            shape=(12, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.setup_active_df()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
@@ -387,12 +398,12 @@ class LSTM_Env(TradingEnv):
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
             self.active_df['NormedClose'].values[self.current_step: end],
-            self.active_df['Close'].values[self.current_step: end],
+            # self.active_df['Close'].values[self.current_step: end],
             self.active_df['TimeEncodedX'].values[self.current_step: end],
             self.active_df['TimeEncodedY'].values[self.current_step: end],
             self.active_df['DayEncodedX'].values[self.current_step: end],
             self.active_df['DayEncodedY'].values[self.current_step: end],
-            self.active_df['HighRiskTime'].values[self.current_step: end],
+            # self.active_df['HighRiskTime'].values[self.current_step: end],
             self.actions[self.current_step: end],
             self.net_worth_history[self.current_step: end],
             self.eur_history[self.current_step: end],
