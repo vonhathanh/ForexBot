@@ -6,27 +6,40 @@ from trading_graph import StockTradingGraph
 from gym import spaces
 from util import standardize_data, get_episode
 from metrics import Metric
-from enum import Enum
+
 # a trading session is a fragment of training data
 # when we've finished training agent in a session, we move on to another one (different fragment)
 # this variable determined maximum time allowed in a session
 MAX_TRADING_SESSION = 2000
+
 # 1 lot in forex equal to 100000 usd
 LOT_SIZE = 100000
+
 # look back window, agent will use this to know what happended in the past 8 time frame
 WINDOW_SIZE = 8
+
 # comission when we making a trade
 COMISSION = 0.0002
 
 INITIAL_BALANCE = 100000
-ACTIONS = {0: "hold", 1: "buy", 2: "sell", 3: "close", 4: "close_and_buy", 5: "close_and_sell"}
 
+# this constant is used to normalize agent's balance to range [-1, 1]
+# currently we don't have a more sophisticated method to do that so we just stick with this one
+BALANCE_NORM_FACTOR = 500000
+# action enum, openai gym don't accept enum class so we just use constants here
 HOLD = 0
 BUY = 1
 SELL = 2
 CLOSE = 3
 CLOSE_AND_BUY = 4
 CLOSE_AND_SELL = 5
+
+ACTIONS = {HOLD: "hold",
+           BUY: "buy",
+           SELL: "sell",
+           CLOSE: "close",
+           CLOSE_AND_BUY: "close_and_buy",
+           CLOSE_AND_SELL: "close_and_sell"}
 
 
 class TradingEnv(gym.Env):
@@ -235,7 +248,6 @@ class TradingEnv(gym.Env):
         else:
             pass
 
-
         self.prev_net_worth = self.net_worth
         # convert our networth to pure usd
         self.net_worth = self.usd_held + \
@@ -301,11 +313,14 @@ class LSTM_Env(TradingEnv):
         # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(12, WINDOW_SIZE + 1),
+                                            shape=(14, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.setup_active_df()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
         self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.eur_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.usd_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.usd_history[0: WINDOW_SIZE] = self.usd_held / BALANCE_NORM_FACTOR
 
     def setup_active_df(self):
         """
@@ -320,6 +335,11 @@ class LSTM_Env(TradingEnv):
         else:
             # pick random episode index from our db
             episode_index = np.random.randint(0, self.current_epoch * 8)
+            # check if we have reached the end of dataset
+            # and reroll the invalid index
+            # if episode_index >= len(self.episode_indices):
+            #     episode_index = np.random.randint(0, len(self.episode_indices))
+
             (start_episode, end_episode) = self.episode_indices[episode_index]
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
             self.frame_start = start_episode
@@ -330,6 +350,9 @@ class LSTM_Env(TradingEnv):
     def reset_variables(self):
         super().reset_variables()
         self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE + 1)
+        self.eur_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.usd_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
+        self.usd_history[0: WINDOW_SIZE] = self.usd_held / BALANCE_NORM_FACTOR
         self.net_worth_history = np.zeros(
             len(self.active_df) + WINDOW_SIZE + 1)
 
@@ -340,8 +363,10 @@ class LSTM_Env(TradingEnv):
     def take_action(self, action, current_price):
         super().take_action(action, current_price)
         # save these variables for training
-        self.actions[self.current_step + WINDOW_SIZE] = action
-        self.net_worth_history[self.current_step + WINDOW_SIZE] = (
+        self.actions[self.current_step + WINDOW_SIZE + 1] = action
+        self.eur_history[self.current_step + WINDOW_SIZE + 1] = self.eur_held / BALANCE_NORM_FACTOR
+        self.usd_history[self.current_step + WINDOW_SIZE + 1] = self.usd_held / BALANCE_NORM_FACTOR
+        self.net_worth_history[self.current_step + WINDOW_SIZE + 1] = (
             self.net_worth - self.prev_net_worth) / LOT_SIZE
         # increase training data after one epoch
         if self.metrics.num_step % 100000 == 0 and self.metrics.num_step > 0:
@@ -370,6 +395,8 @@ class LSTM_Env(TradingEnv):
             self.active_df['HighRiskTime'].values[self.current_step: end],
             self.actions[self.current_step: end],
             self.net_worth_history[self.current_step: end],
+            self.eur_history[self.current_step: end],
+            self.usd_history[self.current_step: end]
             # atr,
             # macd,
             # rsi

@@ -39,8 +39,8 @@ if __name__ == '__main__':
         test_env = DummyVecEnv([lambda: TradingEnv(test_df,serial)])
         model = PPO2(MlpPolicy, train_env, gamma=0.95, verbose=1, tensorboard_log='./logs')
     else:
-        train_env = DummyVecEnv([lambda: LSTM_Env(train_df, serial)])
-        test_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial)])
+        train_env = DummyVecEnv([lambda: LSTM_Env(test_df, serial)])
+        test_env = DummyVecEnv([lambda: LSTM_Env(train_df, serial)])
 
         model = PPO2(CustomLSTMPolicy,
                      train_env,
@@ -64,11 +64,11 @@ if __name__ == '__main__':
         print("Loading model at: ", save_path)
         model = PPO2.load(save_path)
         print("Start testing on train set")
-        evaluate_train_set(model, train_env, 15000, render_mode)
+        evaluate_train_set(model, test_env, 15000, render_mode)
 
         if args.test_mode == 'double':
             print("Start testing on test set")
-            evaluate_test_set(model, test_env, len(test_df), render_mode)
+            evaluate_test_set(model, train_env, len(test_df), render_mode)
 
         print("Testing's comeplete")
 
