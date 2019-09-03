@@ -26,8 +26,6 @@ class CustomLSTMPolicy(MlpLstmPolicy):
             reuse,
             layer_norm=False,
             feature_extraction="mlp",
-            net_arch=[
-                128,
-                64,
-                'lstm'],
+            net_arch=['lstm', dict(pi=[128, 64],
+                                   vf=[128, 64])],
             **_kwargs)

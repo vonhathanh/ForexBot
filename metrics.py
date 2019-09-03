@@ -1,3 +1,5 @@
+import env
+
 class Metric:
     def __init__(self, initial_balance):
         # these properties are our metric for comparing different models
@@ -13,6 +15,9 @@ class Metric:
         self.highest_net_worth = initial_balance
         self.lowest_net_worth = initial_balance
         self.net_worth = 0
+        # epoch counter, for each epoch passed (about 100k steps),
+        # we will increase the epoch and add 8 more weeks to training data
+        self.current_epoch = 1
         # create metrics dict for plotting purpose
         self.metrics = {"num_step": [],
                         "win_trades": [],
@@ -22,7 +27,7 @@ class Metric:
                         "worst_trade": [],
                         "net_worth": []}
 
-    def summary(self, action, net_worth, prev_net_worth, reward):
+    def summary(self, action, net_worth, prev_net_worth, reward, eur_held):
         profit = net_worth - prev_net_worth
         self.num_step += 1
         self.net_worth = net_worth
@@ -30,12 +35,13 @@ class Metric:
         if action == 0:
             self.hold_trades += 1
 
-        if net_worth + 10 < prev_net_worth:
-            self.lose_trades += 1
-            self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
-        elif net_worth > prev_net_worth:
-            self.win_trades += 1
-            self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
+        if action in [env.CLOSE_AND_SELL, env.CLOSE_AND_BUY, env.CLOSE] or eur_held == 0:
+            if net_worth + 10 < prev_net_worth:
+                self.lose_trades += 1
+                self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
+            elif net_worth > prev_net_worth:
+                self.win_trades += 1
+                self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
 
         self.avg_reward += reward
 

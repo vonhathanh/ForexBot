@@ -7,6 +7,7 @@ from gym import spaces
 from util import standardize_data, get_episode
 from metrics import Metric
 
+np.set_printoptions(precision=5)
 # a trading session is a fragment of training data
 # when we've finished training agent in a session, we move on to another one (different fragment)
 # this variable determined maximum time allowed in a session
@@ -14,6 +15,9 @@ MAX_TRADING_SESSION = 2000
 
 # 1 lot in forex equal to 100000 usd
 LOT_SIZE = 100000
+
+# amount when buy, sell
+AMOUNT = 0.5
 
 # look back window, agent will use this to know what happended in the past 8 time frame
 WINDOW_SIZE = 8
@@ -42,14 +46,11 @@ ACTIONS = {HOLD: "hold",
            CLOSE_AND_SELL: "close_and_sell"}
 
 
-class TradingEnv(gym.Env):
+# env that use lstm architecture to train the model
+class LSTM_Env(gym.Env):
 
-    def __init__(self, df, serial=False):
-        """
-        :param df: (Pandas DataFrame) The current Dataframe we interested in
-        :param serial: (bool) Decide whether we want to split the data to multiple part or not
-        """
-        super(TradingEnv, self).__init__()
+    def __init__(self, df,
+                 serial=False):
         self.df = standardize_data(df, method="log_and_diff").dropna().reset_index(drop=True)
         self.net_worth = INITIAL_BALANCE
         self.prev_net_worth = INITIAL_BALANCE
@@ -63,22 +64,32 @@ class TradingEnv(gym.Env):
         # our profit in last 5 trades
         self.returns = np.array([0, 0, 0, 0, 0])
 
-        # TODO: do we need to add buy stop, sell stop, buy limit, sell limit to action space? (may be not, start simple first)
-        # action: buy, sell, hold, close <=> 0, 1, 2, 3
-        # amount: 0.1, 0.2, 0.5, 1, 2, 5 lot (ignore amount for now, we will use 0.5 lot as default
-        # => 4 actions available
+        # index of episodes ( 1 episode equivalent to 1 week of trading)
+        self.episode_indices = get_episode(self.df)
         self.action_space = spaces.Discrete(6)
-        # observe the OHCL values, networth, time, and trade history (eur held,
-        # usd held, actions)
+        # observation space, includes: OLHC prices (normalized), close price (unnormalized),
+        # time in minutes(encoded), day of week(encoded), action history, net worth changes history
+        # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(4, WINDOW_SIZE + 1),
+                                            shape=(12, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.metrics = Metric(INITIAL_BALANCE)
-        np.random.seed(69)
+        self.last_trade_step = 0
+        self.setup_active_df()
+        self.agent_history = {"actions": np.zeros(len(self.active_df) + WINDOW_SIZE),
+                              "net_worth": np.zeros(len(self.active_df) + WINDOW_SIZE),
+                              "eur_held": np.zeros(len(self.active_df) + WINDOW_SIZE),
+                              "usd_held": np.full(len(self.active_df), self.usd_held / BALANCE_NORM_FACTOR)}
 
     def get_metrics(self):
         return self.metrics
+
+    def get_current_price(self):
+        """
+        :return: (float) closing price at time step x
+        """
+        return self.active_df.iloc[self.current_step + WINDOW_SIZE].Close
 
     def reset(self):
         """
@@ -87,6 +98,31 @@ class TradingEnv(gym.Env):
         """
         self.reset_session()
         return self.next_observation()
+
+    def setup_active_df(self):
+        """
+        select fragment of data we will use to train agent in this epoch
+        :return: None
+        """
+        # if serial mode is enabled, we traverse through training data from 2012->2019
+        # else we'll just jumping randomly betweek these times
+        if self.serial:
+            self.steps_left = len(self.df) - WINDOW_SIZE - 1
+            self.frame_start = 0
+        else:
+            # pick random episode index from our db
+            episode_index = np.random.randint(0, self.metrics.current_epoch * 8)
+            # check if we have reached the end of dataset
+            # and reroll the invalid index
+            if episode_index >= len(self.episode_indices):
+                episode_index = np.random.randint(0, len(self.episode_indices))
+
+            (start_episode, end_episode) = self.episode_indices[episode_index]
+            self.steps_left = end_episode - start_episode - WINDOW_SIZE
+            self.frame_start = start_episode
+
+        self.active_df = self.df[self.frame_start: self.frame_start +
+                                 self.steps_left + WINDOW_SIZE + 1]
 
     def reset_variables(self):
         """
@@ -100,52 +136,45 @@ class TradingEnv(gym.Env):
         self.eur_held = 0
         self.trades = []
         self.returns = np.array([0, 0, 0, 0, 0])
-
-    def setup_active_df(self):
-        """
-        Determine which part of data frame will be used for training or testing
-        :return: None
-        """
-        if self.serial:
-            self.steps_left = len(self.df) - WINDOW_SIZE - 1
-            self.frame_start = WINDOW_SIZE
-        else:
-            self.steps_left = np.random.randint(500, MAX_TRADING_SESSION)
-            self.frame_start = np.random.randint(
-                WINDOW_SIZE, len(self.df) - self.steps_left)
-
-        self.active_df = self.df[self.frame_start - \
-            WINDOW_SIZE: self.frame_start + self.steps_left]
+        self.agent_history = {"actions": np.zeros(len(self.active_df) + WINDOW_SIZE),
+                              "net_worth": np.zeros(len(self.active_df) + WINDOW_SIZE),
+                              "eur_held": np.zeros(len(self.active_df) + WINDOW_SIZE),
+                              "usd_held": np.full(len(self.active_df), self.usd_held / BALANCE_NORM_FACTOR)}
 
     def reset_session(self):
         """
         # reset all variables and setup new training session
         :return: None
         """
-        self.reset_variables()
         self.setup_active_df()
+        self.reset_variables()
 
-    def next_observation(self):
+    def calculate_reward(self, action):
         """
-        :return: (Gym.Box) the next observation of the environment
+        update reward we get at this time step
+        :return: None
         """
-        end = self.current_step + WINDOW_SIZE + 1
+        # calculate reward
+        self.reward = 0
+        profit = self.net_worth - self.prev_net_worth
+        if 50 > profit > 0:
+            self.reward += 0.2
+        elif 0 > profit > -25:
+            self.reward -= 0.1
 
-        obs = np.array([
-            # self.active_df['NormalizedTime'].values[self.current_step: end],
-            self.active_df['Open'].values[self.current_step: end],
-            self.active_df['High'].values[self.current_step: end],
-            self.active_df['Low'].values[self.current_step: end],
-            self.active_df['NormedClose'].values[self.current_step: end],
-        ])
+        if profit > 50:
+            self.reward += 0.3
+        elif profit < - 50:
+            self.reward -= 0.2
 
-        return obs
+        if abs(self.eur_held > LOT_SIZE):
+            self.reward -= 0.2 * (abs(self.eur_held) / LOT_SIZE)
 
-    def get_current_price(self):
-        """
-        :return: (float) closing price at time step x
-        """
-        return self.active_df.iloc[self.current_step + WINDOW_SIZE].Close
+        self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward, self.eur_held)
+
+        if action in [CLOSE_AND_SELL, CLOSE_AND_BUY, CLOSE] or self.eur_held == 0:
+            self.last_trade_step = self.current_step - 1
+            self.prev_net_worth = self.net_worth
 
     def step(self, action):
         """
@@ -155,45 +184,12 @@ class TradingEnv(gym.Env):
         """
         # perform action and update utility variables
         self.take_action(action, self.get_current_price())
-        self.steps_left -= 1
-        self.current_step += 1
-        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
-
-        # calculate reward
-        if self.prev_net_worth + 10 <= self.net_worth:
-            self.reward = 1
-        else:
-            self.reward = -1
-        if np.sum(self.returns >= 0) >= 3:
-            self.reward += 0.5
-
-
-        # if self.prev_net_worth <= 0 or self.net_worth <= 0:
-        #     self.reward = -5
-        # else:
-        #     if self.net_worth > self.prev_net_worth:
-        #         self.reward = 1
-        #     else:
-        #         self.reward = -1
-        #     if np.sum(self.returns >= 0) >= 3:
-        #         self.reward += 3
-        #     elif np.sum(self.returns < 0) >= 3:
-        #         self.reward -= 5
-        #     if np.sum(self.returns) > 100:
-        #         self.reward += 3
-        #     elif np.sum(self.returns) < -100:
-        #         self.reward -= 5
+        self.calculate_reward(action)
 
         # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
         done = self.net_worth <= 0
-
         # summary training process
-        self.metrics.summary(
-            action,
-            self.net_worth,
-            self.prev_net_worth,
-            self.reward)
 
         # reset session if we've reached the end of episode
         if self.steps_left == 0:
@@ -202,18 +198,44 @@ class TradingEnv(gym.Env):
 
         return obs, self.reward, done, {}
 
-    def take_action(self, action, current_price):
+    def update(self, action):
+        sell_price = self.get_current_price()
+        buy_price = sell_price + COMISSION
+        # convert our networth to pure usd
+        self.net_worth = self.usd_held + \
+                         (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+
+        self.trades.append({'price': sell_price,
+                            'eur_held': self.eur_held,
+                            'usd_held': self.usd_held,
+                            'net_worth': self.net_worth,
+                            "prev_net_worth": self.prev_net_worth,
+                            'type': ACTIONS[action]})
+
+        # save these variables for training
+        self.agent_history["actions"][self.current_step + WINDOW_SIZE + 1] = action
+        self.agent_history["eur_held"][self.current_step + WINDOW_SIZE + 1] = self.eur_held / BALANCE_NORM_FACTOR
+        self.agent_history["usd_held"][self.current_step + WINDOW_SIZE + 1] = self.usd_held / BALANCE_NORM_FACTOR
+        self.agent_history["net_worth"][self.current_step + WINDOW_SIZE + 1] = \
+            (self.net_worth - self.prev_net_worth) / LOT_SIZE
+
+        # increase training data after one epoch
+        if self.metrics.num_step % 100000 == 0 and self.metrics.num_step > 0:
+            self.metrics.current_epoch += 1
+        self.steps_left -= 1
+        self.current_step += 1
+        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
+
+    def take_action(self, action, sell_price):
         """
         Perform choosen action and then update our balance according to market state
         :param action: (int) 0 = hold, 1 = buy, 2 = sell
-        :param current_price: (float) current closing price
+        :param sell_price: (float) current closing price
         :return: None
         """
-        amount = 0.5
         # in forex, we buy with current price + comission (it's normaly 3 pip
         # with eurusd pair)
-        buy_price = current_price + COMISSION
-        sell_price = current_price
+        buy_price = sell_price + COMISSION
 
         '''assume we have 100,000 usd and 0 eur
         assume current price is 1.5 (1 eur = 1.5 usd)
@@ -223,52 +245,76 @@ class TradingEnv(gym.Env):
         => out networth: 50,000 * 1.5 + 24985 = 99985 (we lose 3 pip, 1 pip = 5 usd,
         we are using 0.5 lot as defaut, if we buy 1 lot => 1 pip = 10 usd, correct!!! )'''
         if action == CLOSE_AND_BUY:  # buy eur
-            # if we are go long (holding eur in positive amount), increase it
-            if self.eur_held >= 0:
-                self.eur_held += amount * LOT_SIZE
-                self.usd_held -= amount * LOT_SIZE * buy_price
-            # otherwise, we are go short (holding eur in negative amount),
-            # reset the amount of eur we're holding by convert all eur to usd
-            # buy some eur
-            else:
-                self.usd_held += self.eur_held * buy_price
-                self.eur_held = amount * LOT_SIZE
-                self.usd_held -= amount * LOT_SIZE * buy_price
+            self.close_and_buy(buy_price, sell_price)
         elif action == CLOSE_AND_SELL:  # sell eur
-            # if we are go long (holding eur in positive amount)
-            # reset the amount of eur we're holding by convert all eur to usd
-            # sell some eur
-            if self.eur_held >= 0:
-                self.usd_held += self.eur_held * sell_price
-                self.eur_held = -amount * LOT_SIZE
-                self.usd_held += amount * LOT_SIZE * sell_price
-            # otherwise, we are go short (holding eur in negative amount), decrease it
-            else:
-                self.eur_held -= amount * LOT_SIZE
-                self.usd_held += amount * LOT_SIZE * sell_price
+            self.close_and_sell(buy_price, sell_price)
         elif action == CLOSE:
-            # close trade, release all eur we are holding (or buying)
-            self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
-            self.eur_held = 0
+            self.close_all_order(buy_price, sell_price)
         elif action == BUY:
-            self.eur_held += amount * LOT_SIZE
-            self.usd_held -= amount * LOT_SIZE * buy_price
+            self.buy(buy_price)
         elif action == SELL:
-            self.eur_held -= amount * LOT_SIZE
-            self.usd_held += amount * LOT_SIZE * sell_price
+            self.sell(sell_price)
         else:
             pass
 
-        self.prev_net_worth = self.net_worth
-        # convert our networth to pure usd
-        self.net_worth = self.usd_held + \
-            (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+        self.update(action)
 
-        self.trades.append({'price': current_price,
-                            'eur_held': self.eur_held,
-                            'usd_held': self.usd_held,
-                            'net_worth': self.net_worth,
-                            'type': ACTIONS[action]})
+    def close_and_buy(self, buy_price, sell_price):
+        self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+        # buy some eur
+        self.eur_held = AMOUNT * LOT_SIZE
+        self.usd_held -= AMOUNT * LOT_SIZE * buy_price
+
+    def close_and_sell(self, buy_price, sell_price):
+        self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+        # sell some eur
+        self.eur_held = -AMOUNT * LOT_SIZE
+        self.usd_held += AMOUNT * LOT_SIZE * sell_price
+
+    def close_all_order(self, buy_price, sell_price):
+        # close trade, release all eur we are holding (or buying)
+        self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+        self.eur_held = 0
+
+    def buy(self, buy_price):
+        self.eur_held += AMOUNT * LOT_SIZE
+        self.usd_held -= AMOUNT * LOT_SIZE * buy_price
+
+    def sell(self, sell_price):
+        self.eur_held -= AMOUNT * LOT_SIZE
+        self.usd_held += AMOUNT * LOT_SIZE * sell_price
+
+    def next_observation(self):
+        # return the next observation of the environment
+        end = self.current_step + WINDOW_SIZE + 1
+
+        # atr = ta.average_true_range(self.active_df.High[self.current_step: end] * 100,
+        #                             self.active_df.Low[self.current_step: end] * 100,
+        #                             self.active_df.Close[self.current_step: end] * 100, n=9, fillna=True).to_numpy()
+        # macd = ta.macd(self.active_df.Close[self.current_step: end] * 200, n_fast=9, n_slow=9, fillna=True).to_numpy()
+        # rsi = ta.rsi(self.active_df.Close[self.current_step: end] / 100, fillna=True, n=9).to_numpy()
+
+        obs = np.array([
+            self.active_df['Open'].values[self.current_step: end],
+            self.active_df['High'].values[self.current_step: end],
+            self.active_df['Low'].values[self.current_step: end],
+            self.active_df['NormedClose'].values[self.current_step: end],
+            # self.active_df['Close'].values[self.current_step: end],
+            self.active_df['TimeEncodedX'].values[self.current_step: end],
+            self.active_df['TimeEncodedY'].values[self.current_step: end],
+            self.active_df['DayEncodedX'].values[self.current_step: end],
+            self.active_df['DayEncodedY'].values[self.current_step: end],
+            # self.active_df['HighRiskTime'].values[self.current_step: end],
+            self.agent_history["actions"][self.current_step: end],
+            self.agent_history["net_worth"][self.current_step: end],
+            self.agent_history["eur_held"][self.current_step: end],
+            self.agent_history["usd_held"][self.current_step: end]
+            # atr,
+            # macd,
+            # rsi
+        ])
+
+        return obs
 
     def render(self, mode='human'):
         """
@@ -306,111 +352,3 @@ class TradingEnv(gym.Env):
             print("{:<25s}{:>5.2f}".format("Worst trade lose:", self.metrics.worst_trade))
             print("{:<25s}{:>5.2f}".format("Win ratio:", self.metrics.win_trades / (self.metrics.lose_trades + 1 + self.metrics.win_trades)))
             print('-' * 80)
-
-
-# env that use lstm architecture to train the model
-class LSTM_Env(TradingEnv):
-
-    def __init__(self, df,
-                 serial=False):
-        super().__init__(df, serial)
-        # epoch counter, for each epoch passed (about 100k steps),
-        # we will increase the epoch and add 8 more weeks to training data
-        self.current_epoch = 1
-        # index of current episode ( 1 episode equivalent to 1 week of trading)
-        self.episode_indices = get_episode(self.df)
-        # observation space, includes: OLHC prices (normalized), close price (unnormalized),
-        # time in minutes(encoded), day of week(encoded), action history, net worth changes history
-        # both minutes, days feature are encoded using sin and cos function to retain circularity
-        self.observation_space = spaces.Box(low=-10,
-                                            high=10,
-                                            shape=(12, WINDOW_SIZE + 1),
-                                            dtype=np.float16)
-        self.setup_active_df()
-        self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.net_worth_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.eur_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.usd_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.usd_history[0: WINDOW_SIZE] = self.usd_held / BALANCE_NORM_FACTOR
-
-    def setup_active_df(self):
-        """
-        select fragment of data we will use to train agent in this epoch
-        :return: None
-        """
-        # if serial mode is enabled, we traverse through training data from 2012->2019
-        # else we'll just jumping randomly betweek these times
-        if self.serial:
-            self.steps_left = len(self.df) - WINDOW_SIZE - 1
-            self.frame_start = 0
-        else:
-            # pick random episode index from our db
-            episode_index = np.random.randint(0, self.current_epoch * 8)
-            # check if we have reached the end of dataset
-            # and reroll the invalid index
-            # if episode_index >= len(self.episode_indices):
-            #     episode_index = np.random.randint(0, len(self.episode_indices))
-
-            (start_episode, end_episode) = self.episode_indices[episode_index]
-            self.steps_left = end_episode - start_episode - WINDOW_SIZE
-            self.frame_start = start_episode
-
-        self.active_df = self.df[self.frame_start: self.frame_start +
-                                 self.steps_left + WINDOW_SIZE + 1]
-
-    def reset_variables(self):
-        super().reset_variables()
-        self.actions = np.zeros(len(self.active_df) + WINDOW_SIZE + 1)
-        self.eur_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.usd_history = np.zeros(len(self.active_df) + WINDOW_SIZE)
-        self.usd_history[0: WINDOW_SIZE] = self.usd_held / BALANCE_NORM_FACTOR
-        self.net_worth_history = np.zeros(
-            len(self.active_df) + WINDOW_SIZE + 1)
-
-    def reset_session(self):
-        self.setup_active_df()
-        self.reset_variables()
-
-    def take_action(self, action, current_price):
-        super().take_action(action, current_price)
-        # save these variables for training
-        self.actions[self.current_step + WINDOW_SIZE + 1] = action
-        self.eur_history[self.current_step + WINDOW_SIZE + 1] = self.eur_held / BALANCE_NORM_FACTOR
-        self.usd_history[self.current_step + WINDOW_SIZE + 1] = self.usd_held / BALANCE_NORM_FACTOR
-        self.net_worth_history[self.current_step + WINDOW_SIZE + 1] = (
-            self.net_worth - self.prev_net_worth) / LOT_SIZE
-        # increase training data after one epoch
-        if self.metrics.num_step % 100000 == 0 and self.metrics.num_step > 0:
-            self.current_epoch += 1
-
-    def next_observation(self):
-        # return the next observation of the environment
-        end = self.current_step + WINDOW_SIZE + 1
-
-        # atr = ta.average_true_range(self.active_df.High[self.current_step: end] * 100,
-        #                             self.active_df.Low[self.current_step: end] * 100,
-        #                             self.active_df.Close[self.current_step: end] * 100, n=9, fillna=True).to_numpy()
-        # macd = ta.macd(self.active_df.Close[self.current_step: end] * 200, n_fast=9, n_slow=9, fillna=True).to_numpy()
-        # rsi = ta.rsi(self.active_df.Close[self.current_step: end] / 100, fillna=True, n=9).to_numpy()
-
-        obs = np.array([
-            self.active_df['Open'].values[self.current_step: end],
-            self.active_df['High'].values[self.current_step: end],
-            self.active_df['Low'].values[self.current_step: end],
-            self.active_df['NormedClose'].values[self.current_step: end],
-            # self.active_df['Close'].values[self.current_step: end],
-            self.active_df['TimeEncodedX'].values[self.current_step: end],
-            self.active_df['TimeEncodedY'].values[self.current_step: end],
-            self.active_df['DayEncodedX'].values[self.current_step: end],
-            self.active_df['DayEncodedY'].values[self.current_step: end],
-            # self.active_df['HighRiskTime'].values[self.current_step: end],
-            self.actions[self.current_step: end],
-            self.net_worth_history[self.current_step: end],
-            self.eur_history[self.current_step: end],
-            self.usd_history[self.current_step: end]
-            # atr,
-            # macd,
-            # rsi
-        ])
-
-        return obs

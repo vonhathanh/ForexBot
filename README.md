@@ -9,7 +9,7 @@
 - Data source: https://www.histdata.com/download-free-forex-data/
 - Time frame: 1 minutes (230300 <=> 23:03:00)  
 # Agent design  
-- Action space: buy, sell, hold.  
+- Action space: buy, sell, hold, close, close then buy, close then sell.  
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
 # Metrics to measure agent's performance
@@ -18,6 +18,7 @@
 - Maximum drawdown <= 0.1% of current balance (done)
 - Avg win value > 0.5% current balance or 40 pip is prefered
 # TODO:  
+- Use pip instead of money to represent balance, reward...
 - Research why testing result on training and testing data set is quite different (we expect it wouldn't vary too much)
 - Reorganize codes (halfly done)  
 - Improve model accuracy (better reward function, more features as input to our data) (doing)  
@@ -82,3 +83,27 @@ consecutive steps and not losing continously
  win rate is 60%, avg win/lose is 30/10  
 => This means agent has to sacrifice win rate to increase win/lose value.  
 
+# Good reward function:
+1. Small Reward for not losing - but how we define not losing??? if we lose from 0-5 pip, it's not losing
+Reward: 0.1
+2. Medium Reward for winning small amount - how much winning is considered small amount??? 
+1 -> 20 pip is small amount
+Reward: 0.3
+3. Large Reward for winning consecutive steps: if an agent hold currency in a long time and
+the money flow keep going by it's current direction that's mean the risk we take is relatively small
+we should encourage our agent to do that
+How many steps is considered consecutive??? >= 2 steps
+Reward: 0.2 * steps
+4. Medium Punishment for holding too much currency: The more currency we hold
+the higher the risk we take, so we have to punish our agent by doing so
+More than 200k eur is considered pretty much
+Reward: -0.2 * (amount/100k) if amount is > 100k
+5. Small Punishment for losing small amount 
+Reward: -0.3
+6. Medium Punishment for losing consecutive steps
+Reward: -0.2 * steps
+7. Consider the risk for leaving or enter a state (shape reward function)
+What happen if we close a trade???
+8. When should we close a trade? when we see the price is going against us
+or we don't know for sure which direction the price is going
+How do we reward this action??? 
