@@ -198,12 +198,33 @@ def split_dataset(input_file, split_ratio=0.8, train_file_name=None, test_file_n
     print("split dataset complete!")
 
 
+def heikin_ashi_candle(input_file, output_file=None):
+    print("Start insert heikin ashi candle to our dataset")
+    df = pd.read_csv(input_file,
+                     sep=',', index_col=0)
+    df['HeikinClose'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    df['HeikinOpen'] = 0
+    df['HeikinHigh'] = 0
+    df['HeikinLow'] = 0
+
+    df.iat[0, 13] = df['Open'].iloc[0]
+    for i in range(1, len(df)):
+        df.iat[i, 13] = (df.iat[i - 1, 13] + df.iat[i - 1, 5]) / 2
+
+    df['HeikinHigh'] = df.loc[:, ['Open', 'Close']].join(df['High']).max(axis=1)
+
+    df['HeikinLow'] = df.loc[:, ['Open', 'Close']].join(df['Low']).min(axis=1)
+    # save_file(df, input_file, output_file)
+    print("Insert keikin ashi candle is done.")
+    return df
+
+
 def plot_data(input_file):
     print("Start plotting our data set")
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
 
-    df['logged_and_diffed'] = abs(((df['Close']) - ((df['Close']).shift(1))))
+    df['logged_and_diffed'] =(df['Close'] - df['Close'].shift(1)) * 100
     print("quantile: ", df["logged_and_diffed"].quantile(0.9))
     print(round(df["logged_and_diffed"].mean(), 5))
     df['z_norm'] = (df['Close'] - df['Close'].mean()) / df['Close'].std()
@@ -485,12 +506,12 @@ if __name__ == '__main__':
     #
     # plot_metrics(metrics)
 
-    encode_time("./data/EURUSD_m15.csv")
+    # encode_time("./data/EURUSD_m15.csv")
 
     # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
-    insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
-    split_dataset(FULL_DATA_FILE, split_ratio=0.9)
-
+    # insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
+    # split_dataset(FULL_DATA_FILE, split_ratio=0.9)
+    heikin_ashi_candle(TRAIN_FILE)
     pass
 
 
