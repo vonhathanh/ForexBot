@@ -1,23 +1,23 @@
-# Our step-to-step of how to build a successful trading agent  
+## Our step-to-step of how to build a successful trading agent  
 1. Create a gym environment for our agent to learn from (env.py)  
 2. Render a simple, yet elegant visualization of that environment (trading_graph.py)  
 3. Train our agent to learn a profitable strategy (train.py)  
 4. Evaluate our agent's performance on test data and real-time trading (test.py)  
-# Requirements  
+## Requirements  
 - Environment: python 3.6  
 - Requirement: see requirements.txt  
 - Data source: https://www.histdata.com/download-free-forex-data/
 - Time frame: 1 minutes (230300 <=> 23:03:00)  
-# Agent design  
+## Agent design  
 - Action space: buy, sell, hold, close, close then buy, close then sell.  
 - Observation space: open, close, high, low, agent's networth, usd held, eur held, actions in previous 60 time step  
 - Reward: networth(t) - networth(t-1)  
-# Metrics to measure agent's performance
+## Metrics to measure agent's performance
 - Win/lose percent of agent, our target is 70-80% (current rate: 50-60%)
 - Risk to reward ratio, target is 1:4 (the best we've achieved so far is 1:3)
 - Maximum drawdown <= 0.1% of current balance (done)
 - Avg win value > 0.5% current balance or 40 pip is prefered
-# TODO:  
+## TODO:  
 - Use pip instead of money to represent balance, reward...
 - Research why testing result on training and testing data set is quite different (we expect it wouldn't vary too much)
 - Reorganize codes (halfly done)  
@@ -28,7 +28,7 @@
 - Use custom model  
 - Implement weight initialization  
 - Use convnet to test on non-stationary data (this can't be done right now because stable baseline convnet only accept image input)  
-# Dones
+## Dones
 - Normalize reward and other input features (done)
 - Using news data as feature, we must calculate avg time the market is affected by 
 news and then distribute it accordingly to current timeframe (done)  
@@ -45,7 +45,7 @@ train it incorrectly)
 - Create config parser  
 - Overfit one batch of dataset to test model ability  
 - Implement save and restore model functionality  
-# Notes:  
+## Notes:  
 - Price changes dramatically in 15 mins before and 1h mins after critical news  
 - MT4 time zone: UTC+3, history calendar time zone: UTC-4, our data timezone: UTC-5  
 - Setup end-to-end training/evalution skeleton first + get dump baselines.  
@@ -56,7 +56,7 @@ train it incorrectly)
 we need to test it against higher spread  
 - Currently, we don't have any benchmark system to tell us that our agent has perform the most correct action 
 (achieve highest net worth possible) in those data frames   
-# Conclusions and thoughts:
+## Conclusions and thoughts:
 - We can overfit mlp policy after 1m steps of training with data in a very short duration (300x15 minutes)  
 - Eventhough we did overfit the model and it did increase our net worth overtime, but the win ratio is still 50%,  
 we may need to investigate later, because our goal is win rate >= 80%  
@@ -83,7 +83,7 @@ consecutive steps and not losing continously
  win rate is 60%, avg win/lose is 30/10  
 => This means agent has to sacrifice win rate to increase win/lose value.  
 
-# Good reward function:
+## Good reward function:
 1. Small Reward for not losing - but how we define not losing??? if we lose from 0-5 pip, it's not losing
 Reward: 0.1
 2. Medium Reward for winning small amount - how much winning is considered small amount??? 
