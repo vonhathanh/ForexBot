@@ -18,6 +18,7 @@
 - Maximum drawdown <= 0.1% of current balance (done)
 - Avg win value > 0.5% current balance or 40 pip is prefered
 # TODO:  
+- Use heiken-ashi candle
 - Use pip instead of money to represent balance, reward...
 - Research why testing result on training and testing data set is quite different (we expect it wouldn't vary too much)
 - Reorganize codes (halfly done)  
@@ -25,9 +26,7 @@
 - Display trade history   
 - Make action space more diversity  
 - Write unit test  
-- Use custom model  
 - Implement weight initialization  
-- Use convnet to test on non-stationary data (this can't be done right now because stable baseline convnet only accept image input)  
 # Dones
 - Normalize reward and other input features (done)
 - Using news data as feature, we must calculate avg time the market is affected by 

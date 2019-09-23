@@ -1,13 +1,11 @@
 import gym
 import numpy as np
-import ta
 
-from trading_graph import StockTradingGraph
+from src.trading_graph import StockTradingGraph
 from gym import spaces
-from util import standardize_data, get_episode
-from metrics import Metric
+from src.util import standardize_data, get_episode
+from src.metrics import Metric
 
-np.set_printoptions(precision=5)
 # a trading session is a fragment of training data
 # when we've finished training agent in a session, we move on to another one (different fragment)
 # this variable determined maximum time allowed in a session
@@ -72,7 +70,7 @@ class LSTM_Env(gym.Env):
         # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(12, WINDOW_SIZE + 1),
+                                            shape=(13, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.metrics = Metric(INITIAL_BALANCE)
         self.last_trade_step = 0
@@ -159,22 +157,11 @@ class LSTM_Env(gym.Env):
         profit = self.net_worth - self.prev_net_worth
         if 50 > profit > 0:
             self.reward += 0.2
-        elif 0 > profit > -25:
-            self.reward -= 0.1
-
         if profit > 50:
             self.reward += 0.3
-        elif profit < - 50:
-            self.reward -= 0.2
 
         if abs(self.eur_held > LOT_SIZE):
             self.reward -= 0.2 * (abs(self.eur_held) / LOT_SIZE)
-
-        self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward, self.eur_held)
-
-        if action in [CLOSE_AND_SELL, CLOSE_AND_BUY, CLOSE] or self.eur_held == 0:
-            self.last_trade_step = self.current_step - 1
-            self.prev_net_worth = self.net_worth
 
     def step(self, action):
         """
@@ -186,10 +173,16 @@ class LSTM_Env(gym.Env):
         self.take_action(action, self.get_current_price())
         self.calculate_reward(action)
 
+        # summary training process
+        self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward, self.eur_held)
+
+        if action in [CLOSE_AND_SELL, CLOSE_AND_BUY, CLOSE] or self.eur_held == 0:
+            self.last_trade_step = self.current_step - 1
+            self.prev_net_worth = self.net_worth
+
         # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
         done = self.net_worth <= 0
-        # summary training process
 
         # reset session if we've reached the end of episode
         if self.steps_left == 0:
@@ -197,34 +190,6 @@ class LSTM_Env(gym.Env):
             done = True
 
         return obs, self.reward, done, {}
-
-    def update(self, action):
-        sell_price = self.get_current_price()
-        buy_price = sell_price + COMISSION
-        # convert our networth to pure usd
-        self.net_worth = self.usd_held + \
-                         (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
-
-        self.trades.append({'price': sell_price,
-                            'eur_held': self.eur_held,
-                            'usd_held': self.usd_held,
-                            'net_worth': self.net_worth,
-                            "prev_net_worth": self.prev_net_worth,
-                            'type': ACTIONS[action]})
-
-        # save these variables for training
-        self.agent_history["actions"][self.current_step + WINDOW_SIZE + 1] = action
-        self.agent_history["eur_held"][self.current_step + WINDOW_SIZE + 1] = self.eur_held / BALANCE_NORM_FACTOR
-        self.agent_history["usd_held"][self.current_step + WINDOW_SIZE + 1] = self.usd_held / BALANCE_NORM_FACTOR
-        self.agent_history["net_worth"][self.current_step + WINDOW_SIZE + 1] = \
-            (self.net_worth - self.prev_net_worth) / LOT_SIZE
-
-        # increase training data after one epoch
-        if self.metrics.num_step % 100000 == 0 and self.metrics.num_step > 0:
-            self.metrics.current_epoch += 1
-        self.steps_left -= 1
-        self.current_step += 1
-        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
 
     def take_action(self, action, sell_price):
         """
@@ -236,6 +201,18 @@ class LSTM_Env(gym.Env):
         # in forex, we buy with current price + comission (it's normaly 3 pip
         # with eurusd pair)
         buy_price = sell_price + COMISSION
+        # if action == BUY:
+        #     action = SELL
+        # elif action == SELL:
+        #     action = BUY
+        # elif action == CLOSE_AND_SELL:
+        #     action = CLOSE_AND_BUY
+        # elif action == CLOSE_AND_BUY:
+        #     action = CLOSE_AND_SELL
+        # elif action == HOLD:
+        #     action = CLOSE
+        # elif action == CLOSE:
+        #     action = HOLD
 
         '''assume we have 100,000 usd and 0 eur
         assume current price is 1.5 (1 eur = 1.5 usd)
@@ -258,6 +235,36 @@ class LSTM_Env(gym.Env):
             pass
 
         self.update(action)
+
+    def update(self, action):
+        sell_price = self.get_current_price()
+        buy_price = sell_price + COMISSION
+        # convert our networth to pure usd
+        self.net_worth = self.usd_held + \
+                         (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
+
+        self.update_history(sell_price, action)
+        # increase training data after one epoch
+        if self.metrics.num_step % 50000 == 0 and self.metrics.num_step > 0:
+            self.metrics.current_epoch += 1
+        self.steps_left -= 1
+        self.current_step += 1
+        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
+
+    def update_history(self, sell_price, action):
+        self.trades.append({'price': sell_price,
+                            'eur_held': self.eur_held,
+                            'usd_held': self.usd_held,
+                            'net_worth': self.net_worth,
+                            "prev_net_worth": self.prev_net_worth,
+                            'type': ACTIONS[action]})
+
+        # save these variables for training
+        self.agent_history["actions"][self.current_step + WINDOW_SIZE + 1] = action
+        self.agent_history["eur_held"][self.current_step + WINDOW_SIZE + 1] = self.eur_held / BALANCE_NORM_FACTOR
+        self.agent_history["usd_held"][self.current_step + WINDOW_SIZE + 1] = self.usd_held / BALANCE_NORM_FACTOR
+        self.agent_history["net_worth"][self.current_step + WINDOW_SIZE + 1] = \
+            (self.net_worth - self.prev_net_worth) / LOT_SIZE
 
     def close_and_buy(self, buy_price, sell_price):
         self.usd_held += (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
@@ -299,7 +306,7 @@ class LSTM_Env(gym.Env):
             self.active_df['High'].values[self.current_step: end],
             self.active_df['Low'].values[self.current_step: end],
             self.active_df['NormedClose'].values[self.current_step: end],
-            # self.active_df['Close'].values[self.current_step: end],
+            self.active_df['Close'].values[self.current_step: end],
             self.active_df['TimeEncodedX'].values[self.current_step: end],
             self.active_df['TimeEncodedY'].values[self.current_step: end],
             self.active_df['DayEncodedX'].values[self.current_step: end],

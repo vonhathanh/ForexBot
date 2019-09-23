@@ -6,7 +6,7 @@ import numpy as np
 import time
 
 from datetime import datetime
-from html_parser import ForexNewsParser
+from src.html_parser import ForexNewsParser
 
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
 from sklearn.preprocessing import StandardScaler
@@ -203,18 +203,18 @@ def heikin_ashi_candle(input_file, output_file=None):
     df = pd.read_csv(input_file,
                      sep=',', index_col=0)
     df['HeikinClose'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
-    df['HeikinOpen'] = 0
-    df['HeikinHigh'] = 0
-    df['HeikinLow'] = 0
+    df['HeikinOpen'] = 0.0
+    df['HeikinHigh'] = 0.0
+    df['HeikinLow'] = 0.0
 
     df.iat[0, 13] = df['Open'].iloc[0]
     for i in range(1, len(df)):
-        df.iat[i, 13] = (df.iat[i - 1, 13] + df.iat[i - 1, 5]) / 2
+        df.iat[i, 13] = (df.iat[i - 1, 13] + df.iat[i - 1, 12]) / 2
 
-    df['HeikinHigh'] = df.loc[:, ['Open', 'Close']].join(df['High']).max(axis=1)
+    df['HeikinHigh'] = df.loc[:, ['HeikinOpen', 'HeikinClose']].join(df['High']).max(axis=1)
 
-    df['HeikinLow'] = df.loc[:, ['Open', 'Close']].join(df['Low']).min(axis=1)
-    # save_file(df, input_file, output_file)
+    df['HeikinLow'] = df.loc[:, ['HeikinOpen', 'HeikinClose']].join(df['Low']).min(axis=1)
+    save_file(df, input_file, output_file)
     print("Insert keikin ashi candle is done.")
     return df
 
@@ -378,10 +378,10 @@ def encode_time(input_file, output_file=None):
 
 def standardize_data(df, method='log_and_diff'):
     if method == 'log_and_diff':
-        df["NormedClose"] = (df['Close'] - df['Close'].shift(1)) * 100
-        df["Open"] = (df['Open'] - df['Open'].shift(1)) * 100
-        df["High"] = (df['High'] - df['High'].shift(1)) * 100
-        df["Low"] = (df['Low'] - df['Low'].shift(1)) * 100
+        df["NormedClose"] = (df['HeikinClose'] - df['HeikinClose'].shift(1)) * 100
+        df["Open"] = (df['HeikinOpen'] - df['HeikinOpen'].shift(1)) * 100
+        df["High"] = (df['HeikinHigh'] - df['HeikinHigh'].shift(1)) * 100
+        df["Low"] = (df['HeikinLow'] - df['HeikinLow'].shift(1)) * 100
     elif method == 'z_norm':
         scaler = StandardScaler()
         df["NormedClose"] = scaler.fit_transform(df['Close'].to_numpy().reshape((-1, 1)))
@@ -468,7 +468,7 @@ def insert_economical_news_feature(input_file, html_file, output_file=None):
     print("insert successfully")
 
 
-def show_candles_chart(input_file, start, period=100):
+def show_candles_chart(input_file, start, period=100, candle_type="normal"):
     """
     show OHLC price in candle shape
     :param input_file: (string) file name we want to read from
@@ -480,12 +480,18 @@ def show_candles_chart(input_file, start, period=100):
     df = pd.read_csv(input_file)
     df["DayOfYear"] = df["DayOfYear"] + " " + df["Time"] + ":00"
     df["DayOfYear"] = df["DayOfYear"].apply(lambda x: str(x).replace(".", "-"))
-
-    fig = go.Figure(data=[go.Candlestick(x=df["DayOfYear"][start: end],
-                                         open=df['Open'][start: end],
-                                         high=df['High'][start: end],
-                                         low=df['Low'][start: end],
-                                         close=df['Close'][start: end])])
+    if candle_type == "normal":
+        fig = go.Figure(data=[go.Candlestick(x=df["DayOfYear"][start: end],
+                                             open=df['Open'][start: end],
+                                             high=df['High'][start: end],
+                                             low=df['Low'][start: end],
+                                             close=df['Close'][start: end])])
+    else:
+        fig = go.Figure(data=[go.Candlestick(x=df["DayOfYear"][start: end],
+                                             open=df['HeikinOpen'][start: end],
+                                             high=df['HeikinHigh'][start: end],
+                                             low=df['HeikinLow'][start: end],
+                                             close=df['HeikinClose'][start: end])])
 
     fig.show()
 
@@ -510,8 +516,11 @@ if __name__ == '__main__':
 
     # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
     # insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
+    # heikin_ashi_candle(FULL_DATA_FILE)
     # split_dataset(FULL_DATA_FILE, split_ratio=0.9)
-    heikin_ashi_candle(TRAIN_FILE)
+    #
+    # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type='normal')
+    # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type="heikin")
     pass
 
 

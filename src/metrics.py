@@ -1,4 +1,5 @@
-import env
+from src import env
+
 
 class Metric:
     def __init__(self, initial_balance):
