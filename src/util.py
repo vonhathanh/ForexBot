@@ -496,9 +496,48 @@ def show_candles_chart(input_file, start, period=100, candle_type="normal"):
     fig.show()
 
 
+def data_exploration(input_file):
+    """
+    perform EDA on input file
+    :param input_file: csv file contains price history
+    :return: None
+    """
+    df = pd.read_csv(input_file, sep=',', index_col=0)
+    price_diff = np.abs(df.HeikinOpen - df.HeikinClose)
+    print(price_diff.quantile([0.3, 0.6]))
+
+
+def categorize_data(input_file, output_file=None):
+    """
+    categorize price to 7 types: side way, small up, medium up, big up, small down, medium down, big down
+    NOTE: we could add more type to make our data representation more precise
+    :param input_file: csv file contains price history
+    :return: None
+    """
+    print("Start categorize data")
+    df = pd.read_csv(input_file, sep=',', index_col=0)
+    df['PriceDiff'] = (df.HeikinClose - df.HeikinOpen) * 10000
+    df["CandleType"] = 1                                # side way
+
+    df["CandleType"][(1.5 <= df.PriceDiff) & (df.PriceDiff <= 2.6)] = 2    # small up
+    df["CandleType"][(2.7 <= df.PriceDiff) & (df.PriceDiff <= 5.3)] = 3    # medium up
+    df["CandleType"][df.PriceDiff >= 5.4] = 4           # big up
+
+    df["CandleType"][(-1.5 >= df.PriceDiff) & (df.PriceDiff >= -2.6)] = 5  # small down
+    df["CandleType"][(-2.7 >= df.PriceDiff) & (df.PriceDiff >= -5.3)] = 6    # medium down
+    df["CandleType"][df.PriceDiff <= -5.4] = 7          # big down
+
+    df.drop(["PriceDiff"], axis=1, inplace=True)
+    save_file(df, input_file, output_file)
+    print("Categorize data's finished")
+
+
 if __name__ == '__main__':
+
+    # data_exploration("./data/EURUSD_m15_train.csv")
+
     # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
-    # reduce_to_time_frame("./data/EURUSD.csv", 'm15', "./data/EURUSD_m15.csv")
+    # reduce_to_time_frame("./data/EURUSD.c sv", 'm15', "./data/EURUSD_m15.csv")
 
     # plot_data('./data/EURUSD_m15_train.csv')
     # metrics = {"num_step": np.linspace(1, 10),
@@ -517,7 +556,8 @@ if __name__ == '__main__':
     # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
     # insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
     # heikin_ashi_candle(FULL_DATA_FILE)
-    # split_dataset(FULL_DATA_FILE, split_ratio=0.9)
+    categorize_data(FULL_DATA_FILE)
+    split_dataset(FULL_DATA_FILE, split_ratio=0.9)
     #
     # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type='normal')
     # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type="heikin")
