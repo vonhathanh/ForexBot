@@ -4,12 +4,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import time
+import pickle
 
+from keras.models import Sequential
+from keras.layers import Embedding, Flatten, Dense
 from datetime import datetime
 from src.html_parser import ForexNewsParser
+from sklearn.preprocessing import StandardScaler
+from mpl_toolkits import mplot3d
 
 # column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
-from sklearn.preprocessing import StandardScaler
 
 TIME_FRAME = {
     "m1": 1,
@@ -512,6 +516,7 @@ def categorize_data(input_file, output_file=None):
     categorize price to 7 types: side way, small up, medium up, big up, small down, medium down, big down
     NOTE: we could add more type to make our data representation more precise
     :param input_file: csv file contains price history
+    :param output_file: save file path after categorize data
     :return: None
     """
     print("Start categorize data")
@@ -530,6 +535,58 @@ def categorize_data(input_file, output_file=None):
     df.drop(["PriceDiff"], axis=1, inplace=True)
     save_file(df, input_file, output_file)
     print("Categorize data's finished")
+
+
+def embedding_feature(input_file, output_file="./models/embedding_weights.pkl", embedding_size=2):
+    """
+    embedding input feature into vector space
+    :param input_file: csv file contains input feature
+    :param embedding_size: number of dimensions that our embedding vector will have
+    :param output_file: save file path after embedding data
+    :return: None
+    """
+    df = pd.read_csv(input_file, sep=',', index_col=0)
+    df.CandleType = (df.CandleType - 1).astype(int)
+
+    model = Sequential()
+    model.add(Embedding(input_dim=7, output_dim=embedding_size, input_length=1, name="embedding"))
+    model.add(Flatten())
+    model.add(Dense(25, activation="relu"))
+    # model.add(Dense(15, activation="relu"))
+    model.add(Dense(1))
+    model.compile(loss="mse", optimizer="adam", metrics=["accuracy"])
+    model.fit(x=df.CandleType.values, y=(df.HeikinClose - df.HeikinOpen).values * 10000, epochs=2, batch_size=8)
+    model.summary()
+
+    layer = model.get_layer('embedding')
+    output_embeddings = layer.get_weights()
+    print("output embedding weights: ", output_embeddings)
+    with open(output_file, 'wb') as file:
+        pickle.dump(output_embeddings[0], file, protocol=3)
+    print("dumped embedding weights to: ../models/embedding_weights.pkl")
+
+
+def visualize_embedding(input_file="./models/embedding_weights.pkl"):
+    """
+    display the embedding weights in 3d-4d plot
+    :param input_file: file contains embedding weights
+    :return: None
+    """
+    with open(input_file, 'rb') as file:
+        weights = pickle.load(file)
+    print("weights: ", weights)
+    labels = np.arange(1, 8)
+    fig = plt.figure(figsize=[20, 20])
+    ax = fig.add_subplot(111)
+
+    for i in range(len(labels)):
+        ax.scatter(weights[i, 0], weights[i, 1], color='b')
+        ax.text(weights[i, 0], weights[i, 1], str(labels[i]), size=20, zorder=1, color='k')
+
+    ax.set_xlabel('Embedding 1')
+    ax.set_ylabel('Embedding 2')
+    # ax.set_zlabel('Embedding 3')
+    plt.show()
 
 
 if __name__ == '__main__':
@@ -556,11 +613,15 @@ if __name__ == '__main__':
     # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
     # insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
     # heikin_ashi_candle(FULL_DATA_FILE)
-    categorize_data(FULL_DATA_FILE)
-    split_dataset(FULL_DATA_FILE, split_ratio=0.9)
+    # split_dataset(FULL_DATA_FILE, split_ratio=0.9)
     #
     # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type='normal')
     # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type="heikin")
+
+    # categorize_data(FULL_DATA_FILE)
+    embedding_feature(FULL_DATA_FILE)
+    visualize_embedding()
+
     pass
 
 
