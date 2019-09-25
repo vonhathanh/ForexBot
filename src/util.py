@@ -26,9 +26,12 @@ TIME_FRAME = {
     'w1': 60*24*7,
 }
 
-FULL_DATA_FILE = './data/EURUSD_m15.csv'
+RAW_TXT_FILE = './data/EURUSD.txt'
+RAW_CSV_FILE = './data/EURUSD.csv'
+FULL_DATA_FILE_m15 = './data/EURUSD_m15.csv'
 TRAIN_FILE = './data/EURUSD_m15_train.csv'
 TEST_FILE = './data/EURUSD_m15_test.csv'
+EMBEDDED_WEIGHT_FILE = './models/embedding_weights.pkl'
 
 
 def evaluate_test_set(model, test_env, num_steps, mode='verbose'):
@@ -537,12 +540,12 @@ def categorize_data(input_file, output_file=None):
     print("Categorize data's finished")
 
 
-def embedding_feature(input_file, output_file="./models/embedding_weights.pkl", embedding_size=2):
+def embedding_feature(input_file, output_file=EMBEDDED_WEIGHT_FILE, embedding_size=2):
     """
     embedding input feature into vector space
-    :param input_file: csv file contains input feature
+    :param input_file: relative path to csv file contains input feature
     :param embedding_size: number of dimensions that our embedding vector will have
-    :param output_file: save file path after embedding data
+    :param output_file: relative path to save file after embedding data, if None, save it to input file
     :return: None
     """
     df = pd.read_csv(input_file, sep=',', index_col=0)
@@ -563,13 +566,13 @@ def embedding_feature(input_file, output_file="./models/embedding_weights.pkl", 
     print("output embedding weights: ", output_embeddings)
     with open(output_file, 'wb') as file:
         pickle.dump(output_embeddings[0], file, protocol=3)
-    print("dumped embedding weights to: ../models/embedding_weights.pkl")
+    print("dumped embedding weights to: ", EMBEDDED_WEIGHT_FILE)
 
 
-def visualize_embedding(input_file="./models/embedding_weights.pkl"):
+def visualize_embedding(input_file=EMBEDDED_WEIGHT_FILE):
     """
     display the embedding weights in 3d-4d plot
-    :param input_file: file contains embedding weights
+    :param input_file: relative path to file contains embedding weights
     :return: None
     """
     with open(input_file, 'rb') as file:
@@ -585,18 +588,41 @@ def visualize_embedding(input_file="./models/embedding_weights.pkl"):
 
     ax.set_xlabel('Embedding 1')
     ax.set_ylabel('Embedding 2')
-    # ax.set_zlabel('Embedding 3')
     plt.show()
 
 
+def add_embedded_feature_to_dataset(input_csv_file, input_weights_file=EMBEDDED_WEIGHT_FILE, output_file=None):
+    """
+    insert embedded weights to our dataset
+    :param input_csv_file: relative path to file contains dataset
+    :param input_weights_file: relative path to file contains embedding weights
+    :param output_file: relative path to save csv file after add embedded weights, if None, save it to input file
+    :return: None
+    """
+    print("Start add embedded feature to dataset")
+    df = pd.read_csv(input_csv_file, sep=",", index_col=0)
+    with open(input_weights_file, "rb") as file:
+        weights = pickle.load(file)
+
+    candles = df.CandleType.values
+    candle_to_weights = np.zeros((len(candles), 2))
+    for i in range(len(candles)):
+        candle_to_weights[i] = weights[candles[i] - 1]
+
+    df["CandleEmbededX"] = candle_to_weights[:, 0]
+    df["CandleEmbededY"] = candle_to_weights[:, 1]
+    print("Add embeded feature has finished")
+    save_file(df, input_csv_file)
+
+
+
 if __name__ == '__main__':
-
-    # data_exploration("./data/EURUSD_m15_train.csv")
-
-    # convert_txt_to_csv("data/EURUSD_2011_2019.txt", "data/EURUSD.csv")
-    # reduce_to_time_frame("./data/EURUSD.c sv", 'm15', "./data/EURUSD_m15.csv")
-
-    # plot_data('./data/EURUSD_m15_train.csv')
+    # data_exploration(TRAIN_FILE)
+    #
+    # convert_txt_to_csv(RAW_TXT_FILE, RAW_CSV_FILE)
+    # reduce_to_time_frame(RAW_CSV_FILE, 'm15', FULL_DATA_FILE_m15)
+    #
+    # plot_data(TRAIN_FILE)
     # metrics = {"num_step": np.linspace(1, 10),
     #            "win_trades": np.linspace(1, 10),
     #            "lose_trades": np.linspace(1, 10),
@@ -608,19 +634,20 @@ if __name__ == '__main__':
     #
     # plot_metrics(metrics)
 
-    # encode_time("./data/EURUSD_m15.csv")
-
-    # augmented_dickey_fuller_test('./data/EURUSD_m15_train.csv')
-    # insert_economical_news_feature(FULL_DATA_FILE, "./data/Economic Calendar - Investing.com.html")
-    # heikin_ashi_candle(FULL_DATA_FILE)
-    # split_dataset(FULL_DATA_FILE, split_ratio=0.9)
+    # encode_time(FULL_DATA_FILE_m15)
+    #
+    # augmented_dickey_fuller_test(TRAIN_FILE)
+    # insert_economical_news_feature(FULL_DATA_FILE_m15, "./data/Economic Calendar - Investing.com.html")
+    # heikin_ashi_candle(FULL_DATA_FILE_m15)
     #
     # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type='normal')
     # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type="heikin")
 
-    # categorize_data(FULL_DATA_FILE)
-    embedding_feature(FULL_DATA_FILE)
-    visualize_embedding()
+    # categorize_data(FULL_DATA_FILE_m15)
+    # embedding_feature(FULL_DATA_FILE_m15)
+    # visualize_embedding()
+    add_embedded_feature_to_dataset(FULL_DATA_FILE_m15)
+    split_dataset(FULL_DATA_FILE_m15, split_ratio=0.9)
 
     pass
 
