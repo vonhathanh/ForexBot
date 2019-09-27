@@ -83,26 +83,35 @@ consecutive steps and not losing continously
 => This means agent has to sacrifice win rate to increase win/lose value.  
 
 ## Good reward function:
-1. Small Reward for not losing - but how we define not losing??? if we lose from 0-5 pip, it's not losing
-Reward: 0.1
+1. Small Reward for not losing - but how we define not losing??? if we lose 0 pip, it's not losing
+Reward: 0.01
 2. Medium Reward for winning small amount - how much winning is considered small amount??? 
-1 -> 20 pip is small amount
-Reward: 0.3
+1 -> 5 pip is small amount
+Reward: 0.1
 3. Large Reward for winning consecutive steps: if an agent hold currency in a long time and
 the money flow keep going by it's current direction that's mean the risk we take is relatively small
 we should encourage our agent to do that
 How many steps is considered consecutive??? >= 2 steps
-Reward: 0.2 * steps
+Reward: 0.2 * steps + reward for amount of pip that it has winned
 4. Medium Punishment for holding too much currency: The more currency we hold
 the higher the risk we take, so we have to punish our agent by doing so
 More than 200k eur is considered pretty much
 Reward: -0.2 * (amount/100k) if amount is > 100k
 5. Small Punishment for losing small amount 
-Reward: -0.3
+Reward: -0.1                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
 6. Medium Punishment for losing consecutive steps
-Reward: -0.2 * steps
+Reward: -0.2 * steps + rewar
+d for amount of pip that it has lost
 7. Consider the risk for leaving or enter a state (shape reward function)
 What happen if we close a trade???
+if we close a trade with positive return => win trade => positive reward, 
+otherwise would we punish our agent by closing a losing trade or let it continue to lose 
+because it could become a winning trade in the future???
+Reward: 0.2
 8. When should we close a trade? when we see the price is going against us
 or we don't know for sure which direction the price is going
 How do we reward this action??? 
+Reward: 0.3 when close trade with positive return, penalize small reward (-0.2) when trade is closed with negative return
+9. Should we put average winning value into account?
+TBD
+10. Small lost is allowed but we must penalize big loss heavier than big win
