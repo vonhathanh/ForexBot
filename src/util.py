@@ -9,7 +9,7 @@ import pickle
 from keras.models import Sequential
 from keras.layers import Embedding, Flatten, Dense
 from datetime import datetime
-from src.html_parser import ForexNewsParser
+from html_parser import ForexNewsParser
 from sklearn.preprocessing import StandardScaler
 from mpl_toolkits import mplot3d
 

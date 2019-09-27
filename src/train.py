@@ -4,9 +4,9 @@ import pandas as pd
 from stable_baselines.common.policies import MlpPolicy
 from stable_baselines.common.vec_env import DummyVecEnv
 from stable_baselines import PPO2
-from src.util import evaluate_train_set, evaluate_test_set
-from src.custom_policy import CustomLSTMPolicy
-from src.env import LSTM_Env
+from util import evaluate_train_set, evaluate_test_set
+from custom_policy import CustomLSTMPolicy
+from env import LSTM_Env
 
 
 def make_env(seed, df, serial):
@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     if args.mode == "train":
         print("Training started")
-        model.learn(total_timesteps=300000, seed=69)
+        model.learn(total_timesteps=500000, seed=69)
         model.save(save_path)
         print("Training's done, saved model to: ", save_path)
     else:

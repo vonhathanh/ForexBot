@@ -1,4 +1,4 @@
-from src import env
+import env
 
 
 class Metric:
@@ -33,16 +33,15 @@ class Metric:
         self.num_step += 1
         self.net_worth = net_worth
 
-        if action == 0:
+        if action == 0 or net_worth == prev_net_worth:
             self.hold_trades += 1
 
-        if action in [env.CLOSE_AND_SELL, env.CLOSE_AND_BUY, env.CLOSE] or eur_held == 0:
-            if net_worth + 10 < prev_net_worth:
-                self.lose_trades += 1
-                self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
-            elif net_worth > prev_net_worth:
-                self.win_trades += 1
-                self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
+        if net_worth < prev_net_worth:
+            self.lose_trades += 1
+            self.avg_lose_value += (1 / self.num_step * (-profit - self.avg_lose_value))
+        elif net_worth > prev_net_worth:
+            self.win_trades += 1
+            self.avg_win_value += (1 / self.num_step * (profit - self.avg_win_value))
 
         self.avg_reward += reward
 
