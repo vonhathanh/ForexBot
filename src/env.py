@@ -1,10 +1,10 @@
 import gym
 import numpy as np
 
-from src.trading_graph import StockTradingGraph
+from trading_graph import StockTradingGraph
 from gym import spaces
-from src.util import standardize_data, get_episode
-from src.metrics import Metric
+from util import standardize_data, get_episode
+from metrics import Metric
 
 # a trading session is a fragment of training data
 # when we've finished training agent in a session, we move on to another one (different fragment)
@@ -18,7 +18,7 @@ LOT_SIZE = 100000
 AMOUNT = 0.5
 
 # look back window, agent will use this to know what happended in the past 8 time frame
-WINDOW_SIZE = 8
+WINDOW_SIZE = 48
 
 # comission when we making a trade
 COMISSION = 0.0002
@@ -60,7 +60,7 @@ class LSTM_Env(gym.Env):
         # trade history
         self.trades = []
         # our profit in last 5 trades
-        self.returns = np.array([0, 0, 0, 0, 0])
+        self.returns = np.zeros((10))
 
         # index of episodes ( 1 episode equivalent to 1 week of trading)
         self.episode_indices = get_episode(self.df)
@@ -70,7 +70,7 @@ class LSTM_Env(gym.Env):
         # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(13, WINDOW_SIZE + 1),
+                                            shape=(10, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.metrics = Metric(INITIAL_BALANCE)
         self.last_trade_step = 0
@@ -133,7 +133,7 @@ class LSTM_Env(gym.Env):
         self.usd_held = INITIAL_BALANCE
         self.eur_held = 0
         self.trades = []
-        self.returns = np.array([0, 0, 0, 0, 0])
+        self.returns = np.zeros((10))
         self.agent_history = {"actions": np.zeros(len(self.active_df) + WINDOW_SIZE),
                               "net_worth": np.zeros(len(self.active_df) + WINDOW_SIZE),
                               "eur_held": np.zeros(len(self.active_df) + WINDOW_SIZE),
@@ -155,13 +155,24 @@ class LSTM_Env(gym.Env):
         # calculate reward
         self.reward = 0
         profit = self.net_worth - self.prev_net_worth
-        if 50 > profit > 0:
+        if profit > 0:
             self.reward += 0.2
-        if profit > 50:
-            self.reward += 0.3
+        elif profit < 0:
+            self.reward -= 0.2
+        if np.mean(self.returns) > 0:
+            self.reward += 0.4
+        elif np.mean(self.returns) < 0:
+            self.reward -= 0.4
 
-        if abs(self.eur_held > LOT_SIZE):
-            self.reward -= 0.2 * (abs(self.eur_held) / LOT_SIZE)
+        wining_trade_count = np.sum(self.returns > 0)
+        losing_trade_count = np.sum(self.returns < 0)
+        if wining_trade_count > 5:
+            self.reward += wining_trade_count * 0.05
+        if losing_trade_count > 5:
+            self.reward -= losing_trade_count * 0.05
+
+        if abs(self.eur_held) > LOT_SIZE * 2:
+            self.reward -= 0.2 * abs(self.eur_held) / LOT_SIZE
 
     def step(self, action):
         """
@@ -175,10 +186,6 @@ class LSTM_Env(gym.Env):
 
         # summary training process
         self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward, self.eur_held)
-
-        if action in [CLOSE_AND_SELL, CLOSE_AND_BUY, CLOSE] or self.eur_held == 0:
-            self.last_trade_step = self.current_step - 1
-            self.prev_net_worth = self.net_worth
 
         # get next observation and check whether we has finished this episode yet
         obs = self.next_observation()
@@ -194,7 +201,7 @@ class LSTM_Env(gym.Env):
     def take_action(self, action, sell_price):
         """
         Perform choosen action and then update our balance according to market state
-        :param action: (int) 0 = hold, 1 = buy, 2 = sell
+        :param action: (int) 0 = hold, 1 = buy, 2 = sell, 3 = close, 4 = close and buy, 5 = close and sell
         :param sell_price: (float) current closing price
         :return: None
         """
@@ -240,16 +247,17 @@ class LSTM_Env(gym.Env):
         sell_price = self.get_current_price()
         buy_price = sell_price + COMISSION
         # convert our networth to pure usd
+        self.prev_net_worth = self.net_worth
         self.net_worth = self.usd_held + \
                          (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
 
         self.update_history(sell_price, action)
         # increase training data after one epoch
-        if self.metrics.num_step % 50000 == 0 and self.metrics.num_step > 0:
+        if self.metrics.num_step % 500000 == 0 and self.metrics.num_step > 0:
             self.metrics.current_epoch += 1
         self.steps_left -= 1
         self.current_step += 1
-        self.returns[self.current_step % 5] = self.net_worth - self.prev_net_worth
+        self.returns[self.current_step % 10] = self.net_worth - self.prev_net_worth
 
     def update_history(self, sell_price, action):
         self.trades.append({'price': sell_price,
@@ -302,11 +310,13 @@ class LSTM_Env(gym.Env):
         # rsi = ta.rsi(self.active_df.Close[self.current_step: end] / 100, fillna=True, n=9).to_numpy()
 
         obs = np.array([
-            self.active_df['Open'].values[self.current_step: end],
-            self.active_df['High'].values[self.current_step: end],
-            self.active_df['Low'].values[self.current_step: end],
-            self.active_df['NormedClose'].values[self.current_step: end],
-            self.active_df['Close'].values[self.current_step: end],
+            # self.active_df['Open'].values[self.current_step: end],
+            # self.active_df['High'].values[self.current_step: end],
+            # self.active_df['Low'].values[self.current_step: end],
+            # self.active_df['NormedClose'].values[self.current_step: end],
+            # self.active_df['Close'].values[self.current_step: end],
+            self.active_df['CandleEmbededX'].values[self.current_step: end],
+            self.active_df['CandleEmbededY'].values[self.current_step: end],
             self.active_df['TimeEncodedX'].values[self.current_step: end],
             self.active_df['TimeEncodedY'].values[self.current_step: end],
             self.active_df['DayEncodedX'].values[self.current_step: end],
