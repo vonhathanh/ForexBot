@@ -35,7 +35,14 @@ EMBEDDED_WEIGHT_FILE = './models/embedding_weights.pkl'
 
 
 def evaluate_test_set(model, test_env, num_steps, mode='verbose'):
-    """evaluate model on full test set"""
+    """
+    evaluate model on full test set
+    :param model: trained stable baseline model
+    :param test_env: (DummyVecEnv) environment for testing model
+    :param num_steps: (Int) number of time step we will traverse
+    :param mode: (Str) render mode, verbose = text only, human = display graphics
+    :return: None
+    """
     obs = test_env.reset()
     for i in range(num_steps):
         action, _states = model.predict(obs)
@@ -48,7 +55,14 @@ def evaluate_test_set(model, test_env, num_steps, mode='verbose'):
 
 
 def evaluate_train_set(model, train_env, num_steps, mode='verbose'):
-    """evaluate model on train set"""
+    """
+    evaluate model on train set
+    :param model: trained stable baseline model
+    :param train_env: (DummyVecEnv) environment for testing model
+    :param num_steps: (Int) number of time step we will traverse
+    :param mode: (Str) render mode, verbose = text only, human = display graphics
+    :return:
+    """
     print("Start testing on train set (for overfitting check")
     obs = train_env.reset()
     for i in range(num_steps):
@@ -61,20 +75,31 @@ def evaluate_train_set(model, train_env, num_steps, mode='verbose'):
     plot_metrics(train_env.get_attr('metrics')[0])
 
 
-def save_file(df, input_file, output_file=None):
-    # utility function to help save the file in proper format
-    if output_file is not None:
-        print("Saving output to: ", output_file)
-        df.to_csv(output_file, float_format='%.5f')
+def save_file(df, original_file, output_file_path=None):
+    """
+    utility function to help save the file in proper format
+    :param df: (DataFrame) data we want to save
+    :param original_file: (Str) use when we want to override the original file
+    :param output_file_path: Str) relative path leads to where we want the data to be saved in different file
+    :return: None
+    """
+    if output_file_path is not None:
+        print("Saving output to: ", output_file_path)
+        df.to_csv(output_file_path, float_format='%.5f')
     else:
-        print("Saving output to: ", input_file)
-        df.to_csv(input_file, float_format='%.5f')
+        print("Saving output to: ", original_file)
+        df.to_csv(original_file, float_format='%.5f')
 
 
-def convert_txt_to_csv(input_file, output_file=None):
-    """ convert file data from txt to csv"""
-    print("Start convert: {} to csv".format(input_file))
-    df = pd.read_csv(input_file,
+def convert_txt_to_csv(input_file_path, output_file_path=None):
+    """
+    convert file data from txt to csv
+    :param input_file_path: (Str) relative path lead to data file
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :return: None
+    """
+    print("Start convert: {} to csv".format(input_file_path))
+    df = pd.read_csv(input_file_path,
                      sep=',',
                      header=None,
                      names=["Ticker", "DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
@@ -84,14 +109,21 @@ def convert_txt_to_csv(input_file, output_file=None):
     # drop useless columns
     df.drop(["Ticker", "Vol"], axis=1, inplace=True)
 
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("Convert data to csv is done.")
 
 
-def reduce_to_time_frame(input_file, tf_type, output_file=None):
-    # convert the dataset to higher timeframe format, available options are: m5, m15, m30, h1, h4
+def reduce_to_time_frame(input_file_path, tf_type, output_file_path=None):
+    """
+    convert the dataset to higher timeframe format,
+    available options are: m5, m15, m30, h1, h4
+    :param input_file_path: (Str) relative path leads to data file
+    :param tf_type: (Str) time frame name
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :return:
+    """
     print("Start reduce time frame: to {}".format(tf_type))
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
     # convert dataframe to numpy for faster processing speed
     df_array = df.to_numpy()
@@ -132,15 +164,22 @@ def reduce_to_time_frame(input_file, tf_type, output_file=None):
 
     df.reset_index(drop=True, inplace=True)
 
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("Convert data to {} is done.".format(tf_type))
 
 
-def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
-    # format dayofyear field from int (20110103) to datetime format (2011-01-03)
-    # WARNING: no longer used
+def reformat_date_of_year(input_file_path, format='%Y-%m-%d', output_file_path=None):
+    """
+    format dayofyear field from int (20110103) to datetime format (2011-01-03)
+    WARNING: no longer used
+    :param input_file_path: (Str) relative path leads to data file
+    :param format: (Str) date format, example: '%Y-%m-%d'
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :return: None
+    """
+
     print("Start reformat datetime field")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
 
     def get_plit_date(date):
@@ -154,15 +193,21 @@ def reformat_date_of_year(input_file, format='%Y-%m-%d', output_file=None):
     df['DayOfYear'] = pd.to_datetime(df['DayOfYear'].apply(lambda x: get_plit_date(x)), format=format)
     print(df['DayOfYear'])
     print("time cost: ", time.time() - start)
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("reformat datetime field to is done.")
 
 
-def reformat_time(input_file, output_file=None):
-    # format time field from int (0055) to datetime format (00:55)
-    # WARNING: no longer used
+def reformat_time(input_file_path, output_file_path=None):
+    """
+    format time field from int (0055) to datetime format (00:55)
+    WARNING: no longer used
+    :param input_file_path: (Str) relative path leads to data file
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :return: None
+    """
+
     print("Start reformat Time field")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
 
     def padd_zero(time):
@@ -176,18 +221,32 @@ def reformat_time(input_file, output_file=None):
     df['Time'] = df['Time'].apply(lambda x: padd_zero(str(x)))
 
     print("time cost: ", time.time() - start)
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("reformat Time field to is done.")
 
 
 def date2num(date):
+    """
+    Convert date from pandas data type to string type
+    :param date: Pandas date type
+    :return: Data formatted in string
+    """
     converter = mdates.strpdate2num('%YYYY-%mm-%dd')
     return converter(date)
 
 
-def split_dataset(input_file, split_ratio=0.8, train_file_name=None, test_file_name=None):
+def split_dataset(input_file_path, split_ratio=0.8, train_file_name=None, test_file_name=None):
+    """
+    Split the dataset into train data and testing data
+    :param input_file_path: (Str) relative path leads to data file
+    :param split_ratio: (Float) ratio between train set and test set, range from 0.0 to 1.0
+           0.6 means 60% data is training data and 40% is testing data
+    :param train_file_name: (Str) file name of training data after save
+    :param test_file_name:(Str) file name of testing data after save
+    :return: None
+    """
     print("Start split dataset into train and test set")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
 
     split_point = int(split_ratio * len(df))
@@ -196,18 +255,24 @@ def split_dataset(input_file, split_ratio=0.8, train_file_name=None, test_file_n
     df_test = df[split_point:-1].reset_index(drop=True)
 
     if train_file_name is None:
-        train_file_name = input_file[:-4] + "_train.csv"
+        train_file_name = input_file_path[:-4] + "_train.csv"
     if test_file_name is None:
-        test_file_name = input_file[:-4] + "_test.csv"
+        test_file_name = input_file_path[:-4] + "_test.csv"
 
     save_file(df_train, None, train_file_name)
     save_file(df_test, None, test_file_name)
     print("split dataset complete!")
 
 
-def heikin_ashi_candle(input_file, output_file=None):
+def heikin_ashi_candle(input_file_path, output_file_path=None):
+    """
+    Add heikin ashi candle features to input file
+    :param input_file_path: (Str) relative path leads to input data file
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :return: None
+    """
     print("Start insert heikin ashi candle to our dataset")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
     df['HeikinClose'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
     df['HeikinOpen'] = 0.0
@@ -221,14 +286,19 @@ def heikin_ashi_candle(input_file, output_file=None):
     df['HeikinHigh'] = df.loc[:, ['HeikinOpen', 'HeikinClose']].join(df['High']).max(axis=1)
 
     df['HeikinLow'] = df.loc[:, ['HeikinOpen', 'HeikinClose']].join(df['Low']).min(axis=1)
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("Insert keikin ashi candle is done.")
     return df
 
 
-def plot_data(input_file):
+def plot_data(input_file_path):
+    """
+    Plot data for easier visualization
+    :param input_file_path: (Str) relative path leads to input data file
+    :return: None
+    """
     print("Start plotting our data set")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
 
     df['logged_and_diffed'] =(df['Close'] - df['Close'].shift(1)) * 100
@@ -252,6 +322,12 @@ def plot_data(input_file):
 
 
 def plot_metrics(metric):
+    """
+    Plot the metrics to evaluate agent's performance after training, testing
+    And write the result to ./logs/metrics.txt
+    :param metric: Dictionary contains information about agent trading hisotry
+    :return: None
+    """
     metrics = metric.metrics
     ax1 = plt.subplot(2,3,1)
     ax1.plot(metrics['num_step'], metrics['win_trades'], label='win trades')
@@ -301,6 +377,10 @@ def plot_metrics(metric):
 
 
 def merge_data_2012_2018():
+    """
+    One-time used function
+    :return:
+    """
     data_2012 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2012.csv',
                             names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
     data_2013 = pd.read_csv('./data/DAT_MT_EURUSD_M1_2013.csv',
@@ -326,10 +406,14 @@ def merge_data_2012_2018():
     data_2012_2018.drop(["Vol"], axis=1, inplace=True)
     data_2012_2018.reset_index(inplace=True, drop=True)
 
-    save_file(data_2012_2018, input_file="./data/EURUSD.csv")
+    save_file(data_2012_2018, original_file="./data/EURUSD.csv")
 
 
 def merge_data_2019():
+    """
+    One-time used function
+    :return:
+   """
     data_2019_01 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201901.csv',
                             names=["DayOfYear", "Time", "Open", 'High', 'Low', 'Close', 'Vol'])
     data_2019_02 = pd.read_csv('./data/DAT_MT_EURUSD_M1_201902.csv',
@@ -355,13 +439,18 @@ def merge_data_2019():
     data_2019.drop(["Vol"], axis=1, inplace=True)
     data_2019.reset_index(inplace=True, drop=True)
 
-    save_file(data_2019, input_file="./data/EURUSD_2019.csv")
+    save_file(data_2019, original_file="./data/EURUSD_2019.csv")
 
 
-def encode_time(input_file, output_file=None):
-    # encode time feature to floating values, range [0-1]
+def encode_time(input_file_path, output_file_path=None):
+    """
+    encode time feature to floating values, range [0-1]
+    :param input_file_path: (Str) relative path leads to input data file
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :return: None
+    """
     print("Start encode time")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
     df["DayOfWeek"] = pd.to_datetime(df['DayOfYear'])
     df["DayOfWeek"] = df.DayOfWeek.apply(lambda x: x.dayofweek)
@@ -379,11 +468,17 @@ def encode_time(input_file, output_file=None):
     df['DayEncodedY'] = np.cos(2 * np.pi * df.DayOfWeek / 5)
     df.drop(["TimeInMinute"], axis=1, inplace=True)
 
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("encode time complete!")
 
 
 def standardize_data(df, method='log_and_diff'):
+    """
+    normalize data using different methods
+    :param df: (Dataframe) input data to be processed
+    :param method: (Str) specify which method will be used to normalizing
+    :return: (DataFrame) data after normalizing
+    """
     if method == 'log_and_diff':
         df["NormedClose"] = (df['HeikinClose'] - df['HeikinClose'].shift(1)) * 100
         df["Open"] = (df['HeikinOpen'] - df['HeikinOpen'].shift(1)) * 100
@@ -401,7 +496,11 @@ def standardize_data(df, method='log_and_diff'):
 
 
 def get_episode(df):
-    # get indices of episode in data frame, each episode is one week data
+    """
+    get indices of episode in data frame, each episode is one week data
+    :param df: (Dataframe) input data to be processed
+    :return: (Array of Int) indices of time step where trading start (usually start of the week)
+    """
     def get_end_week_indices(row):
         # get index of one week trading session,
         # weekend at day = 4 (thursday and time = 16:45
@@ -420,10 +519,15 @@ def get_episode(df):
     return true_indices
 
 
-def augmented_dickey_fuller_test(input_file):
+def augmented_dickey_fuller_test(input_file_path):
+    """
+    perfrom ADF test to ensure data has the properies we want
+    :param input_file_path: (Str) relative path leads to input data file
+    :return: None
+    """
     from statsmodels.tsa.stattools import adfuller
     print("Start augmented_dickey_fuller_test on data set")
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
 
     df['logged_and_diffed'] = ((df['Close']) - ((df['Close']).shift(1))) * 100
@@ -431,21 +535,21 @@ def augmented_dickey_fuller_test(input_file):
     print("test result: ", result)
 
 
-def insert_economical_news_feature(input_file, html_file, output_file=None):
+def insert_economical_news_feature(input_file_path, html_file_path, output_file_path=None):
     """
     insert feature indicates that agent is in a high risk state
     (ecomical news is going to be announced)
-    :param output_file: (string) output file name and path
-    :param html_file: (string) path to html file contains economic calendar
-    :param input_file: (string) path to input csv file
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
+    :param html_file_path: (Str) relative path to html file contains economic calendar
+    :param input_file_path: Str) relative path leads to input data file
     :return: None
     """
-    df = pd.read_csv(input_file,
+    df = pd.read_csv(input_file_path,
                      sep=',', index_col=0)
     df["HighRiskTime"] = 0
     # read and parse the html to get dates have economical news announced
     print("Start insert economical news feature to dataset")
-    with open(html_file, 'r', encoding='utf-8') as f:
+    with open(html_file_path, 'r', encoding='utf-8') as f:
         html_raw = f.read()
     parser = ForexNewsParser()
     parser.feed(html_raw)
@@ -471,20 +575,20 @@ def insert_economical_news_feature(input_file, html_file, output_file=None):
         elif df.iat[i, 0] > day:
             t += 1
 
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("insert successfully")
 
 
-def show_candles_chart(input_file, start, period=100, candle_type="normal"):
+def show_candles_chart(input_file_path, start, period=100, candle_type="normal"):
     """
     show OHLC price in candle shape
-    :param input_file: (string) file name we want to read from
+    :param input_file_path: (string) relative file path leads to data file
     :param start: (int) index of specific point in time we want to show
     :param period: (int) we normally want to see candles from start to start + period of time
     :return: None
     """
     end = start + period
-    df = pd.read_csv(input_file)
+    df = pd.read_csv(input_file_path)
     df["DayOfYear"] = df["DayOfYear"] + " " + df["Time"] + ":00"
     df["DayOfYear"] = df["DayOfYear"].apply(lambda x: str(x).replace(".", "-"))
     if candle_type == "normal":
@@ -503,27 +607,27 @@ def show_candles_chart(input_file, start, period=100, candle_type="normal"):
     fig.show()
 
 
-def data_exploration(input_file):
+def data_exploration(input_file_path):
     """
     perform EDA on input file
-    :param input_file: csv file contains price history
+    :param input_file_path: (Str) relative file path leads to csv file contains price history
     :return: None
     """
-    df = pd.read_csv(input_file, sep=',', index_col=0)
+    df = pd.read_csv(input_file_path, sep=',', index_col=0)
     price_diff = np.abs(df.HeikinOpen - df.HeikinClose)
     print(price_diff.quantile([0.3, 0.6]))
 
 
-def categorize_data(input_file, output_file=None):
+def categorize_data(input_file_path, output_file_path=None):
     """
     categorize price to 7 types: side way, small up, medium up, big up, small down, medium down, big down
     NOTE: we could add more type to make our data representation more precise
-    :param input_file: csv file contains price history
-    :param output_file: save file path after categorize data
+    :param input_file_path: (Str) relative file path leads to data file we want process
+    :param output_file_path: (Str) relative path lead to where we want the new data to be saved
     :return: None
     """
     print("Start categorize data")
-    df = pd.read_csv(input_file, sep=',', index_col=0)
+    df = pd.read_csv(input_file_path, sep=',', index_col=0)
     df['PriceDiff'] = (df.HeikinClose - df.HeikinOpen) * 10000
     df["CandleType"] = 1                                # side way
 
@@ -536,19 +640,19 @@ def categorize_data(input_file, output_file=None):
     df["CandleType"][df.PriceDiff <= -5.4] = 7          # big down
 
     df.drop(["PriceDiff"], axis=1, inplace=True)
-    save_file(df, input_file, output_file)
+    save_file(df, input_file_path, output_file_path)
     print("Categorize data's finished")
 
 
-def embedding_feature(input_file, output_file=EMBEDDED_WEIGHT_FILE, embedding_size=2):
+def embedding_feature(input_file_path, output_file_path=EMBEDDED_WEIGHT_FILE, embedding_size=2):
     """
     embedding input feature into vector space
-    :param input_file: relative path to csv file contains input feature
-    :param embedding_size: number of dimensions that our embedding vector will have
-    :param output_file: relative path to save file after embedding data, if None, save it to input file
+    :param input_file_path: (Str) relative path to csv file contains input feature
+    :param embedding_size: (Int) number of dimensions that our embedding vector will have
+    :param output_file_path: (Str) relative path to save file after embedding data, if None, save it to input file
     :return: None
     """
-    df = pd.read_csv(input_file, sep=',', index_col=0)
+    df = pd.read_csv(input_file_path, sep=',', index_col=0)
     df.CandleType = (df.CandleType - 1).astype(int)
 
     model = Sequential()
@@ -564,18 +668,18 @@ def embedding_feature(input_file, output_file=EMBEDDED_WEIGHT_FILE, embedding_si
     layer = model.get_layer('embedding')
     output_embeddings = layer.get_weights()
     print("output embedding weights: ", output_embeddings)
-    with open(output_file, 'wb') as file:
+    with open(output_file_path, 'wb') as file:
         pickle.dump(output_embeddings[0], file, protocol=3)
     print("dumped embedding weights to: ", EMBEDDED_WEIGHT_FILE)
 
 
-def visualize_embedding(input_file=EMBEDDED_WEIGHT_FILE):
+def visualize_embedding(input_file_path=EMBEDDED_WEIGHT_FILE):
     """
     display the embedding weights in 3d-4d plot
-    :param input_file: relative path to file contains embedding weights
+    :param input_file_path: (Str) relative path to file contains embedding weights
     :return: None
     """
-    with open(input_file, 'rb') as file:
+    with open(input_file_path, 'rb') as file:
         weights = pickle.load(file)
     print("weights: ", weights)
     labels = np.arange(1, 8)
@@ -594,9 +698,9 @@ def visualize_embedding(input_file=EMBEDDED_WEIGHT_FILE):
 def add_embedded_feature_to_dataset(input_csv_file, input_weights_file=EMBEDDED_WEIGHT_FILE, output_file=None):
     """
     insert embedded weights to our dataset
-    :param input_csv_file: relative path to file contains dataset
-    :param input_weights_file: relative path to file contains embedding weights
-    :param output_file: relative path to save csv file after add embedded weights, if None, save it to input file
+    :param input_csv_file: (Str) relative path to file contains dataset
+    :param input_weights_file: (Str) relative path to file contains embedding weights
+    :param output_file: (Str) relative path to save csv file after add embedded weights, if None, save it to input file
     :return: None
     """
     print("Start add embedded feature to dataset")
