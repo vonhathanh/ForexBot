@@ -73,7 +73,6 @@ class LSTM_Env(gym.Env):
                                             shape=(10, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.metrics = Metric(INITIAL_BALANCE)
-        self.last_trade_step = 0
         self.setup_active_df()
         self.agent_history = {"actions": np.zeros(len(self.active_df) + WINDOW_SIZE),
                               "net_worth": np.zeros(len(self.active_df) + WINDOW_SIZE),
@@ -85,7 +84,7 @@ class LSTM_Env(gym.Env):
 
     def get_current_price(self):
         """
-        :return: (float) closing price at time step x
+        :return: (float) closing price at current time step
         """
         return self.active_df.iloc[self.current_step + WINDOW_SIZE].Close
 
@@ -141,7 +140,7 @@ class LSTM_Env(gym.Env):
 
     def reset_session(self):
         """
-        # reset all variables and setup new training session
+        reset all variables and setup new training session
         :return: None
         """
         self.setup_active_df()
@@ -164,12 +163,12 @@ class LSTM_Env(gym.Env):
         elif np.mean(self.returns) < 0:
             self.reward -= 0.4
 
-        wining_trade_count = np.sum(self.returns > 0)
-        losing_trade_count = np.sum(self.returns < 0)
-        if wining_trade_count > 5:
-            self.reward += wining_trade_count * 0.05
-        if losing_trade_count > 5:
-            self.reward -= losing_trade_count * 0.05
+        # wining_trade_count = np.sum(self.returns > 0)
+        # losing_trade_count = np.sum(self.returns < 0)
+        # if wining_trade_count > 5:
+        #     self.reward += wining_trade_count * 0.05
+        # if losing_trade_count > 5:
+        #     self.reward -= losing_trade_count * 0.05
 
         if abs(self.eur_held) > LOT_SIZE * 2:
             self.reward -= 0.2 * abs(self.eur_held) / LOT_SIZE
@@ -182,8 +181,8 @@ class LSTM_Env(gym.Env):
         """
         # perform action and update utility variables
         self.take_action(action, self.get_current_price())
+        self.update_env(action)
         self.calculate_reward(action)
-
         # summary training process
         self.metrics.summary(action, self.net_worth, self.prev_net_worth, self.reward, self.eur_held)
 
@@ -208,18 +207,6 @@ class LSTM_Env(gym.Env):
         # in forex, we buy with current price + comission (it's normaly 3 pip
         # with eurusd pair)
         buy_price = sell_price + COMISSION
-        # if action == BUY:
-        #     action = SELL
-        # elif action == SELL:
-        #     action = BUY
-        # elif action == CLOSE_AND_SELL:
-        #     action = CLOSE_AND_BUY
-        # elif action == CLOSE_AND_BUY:
-        #     action = CLOSE_AND_SELL
-        # elif action == HOLD:
-        #     action = CLOSE
-        # elif action == CLOSE:
-        #     action = HOLD
 
         '''assume we have 100,000 usd and 0 eur
         assume current price is 1.5 (1 eur = 1.5 usd)
@@ -238,12 +225,13 @@ class LSTM_Env(gym.Env):
             self.buy(buy_price)
         elif action == SELL:
             self.sell(sell_price)
-        else:
-            pass
 
-        self.update(action)
-
-    def update(self, action):
+    def update_env(self, action):
+        """
+        update some environment variables relate to net worth
+        :param action: (Int) action enum
+        :return: None
+        """
         sell_price = self.get_current_price()
         buy_price = sell_price + COMISSION
         # convert our networth to pure usd
@@ -251,7 +239,7 @@ class LSTM_Env(gym.Env):
         self.net_worth = self.usd_held + \
                          (self.eur_held * sell_price if self.eur_held > 0 else self.eur_held * buy_price)
 
-        self.update_history(sell_price, action)
+        self.update_agent_history(sell_price, action)
         # increase training data after one epoch
         if self.metrics.num_step % 500000 == 0 and self.metrics.num_step > 0:
             self.metrics.current_epoch += 1
@@ -259,7 +247,13 @@ class LSTM_Env(gym.Env):
         self.current_step += 1
         self.returns[self.current_step % 10] = self.net_worth - self.prev_net_worth
 
-    def update_history(self, sell_price, action):
+    def update_agent_history(self, sell_price, action):
+        """
+        update variables relate to agent trading history
+        :param sell_price: (Float)
+        :param action: (Int)
+        :return: None
+        """
         self.trades.append({'price': sell_price,
                             'eur_held': self.eur_held,
                             'usd_held': self.usd_held,
