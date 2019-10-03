@@ -12,30 +12,8 @@ from keras.layers import Embedding, Flatten, Dense
 from datetime import datetime
 from html_parser import ForexNewsParser
 from sklearn.preprocessing import StandardScaler
+from constants import *
 from mpl_toolkits import mplot3d
-
-# column headers: <TICKER>,<DTYYYYMMDD>,<TIME>,<OPEN>,<HIGH>,<LOW>,<CLOSE>,<VOL>
-
-SRC_DIR = os.path.dirname(__file__)
-
-
-TIME_FRAME = {
-    "m1": 1,
-    "m5": 5,
-    "m15": 15,
-    "m30": 30,
-    "h1": 60,
-    "h4": 240,
-    'd1': 60*24,
-    'w1': 60*24*7,
-}
-
-RAW_TXT_FILE = os.path.join(SRC_DIR, "..", "data", "EURUSD.txt")
-RAW_CSV_FILE = os.path.join(SRC_DIR, "..", "data", "EURUSD.csv")
-FULL_DATA_FILE_m15 = os.path.join(SRC_DIR, "..", "data", "EURUSD_m15.csv")
-TRAIN_FILE = os.path.join(SRC_DIR, "..", "data", "EURUSD_m15_train.csv")
-TEST_FILE = os.path.join(SRC_DIR, "..", "data", "EURUSD_m15_test.csv")
-EMBEDDED_WEIGHT_FILE = os.path.join(SRC_DIR, "..", "models", "embedding_weights.pkl")
 
 
 def evaluate_test_set(model, test_env, num_steps, mode='verbose'):
@@ -137,20 +115,23 @@ def reduce_to_time_frame(input_file_path, tf_type, output_file_path=None):
     start = 1
     highest = -10
     lowest = 10
+    open = df.columns.get_loc("Open")
+    high = df.columns.get_loc("High")
+    low = df.columns.get_loc("Low")
 
     for i in range(1, len(df)):
         j += 1
         # save lowest and highest price in INTERVAL we want
-        highest = max(highest, df_array[i][3])
-        lowest = min(lowest, df_array[i][4])
+        highest = max(highest, df_array[i][high])
+        lowest = min(lowest, df_array[i][low])
 
         # convert time to integer then use it to check that we hit the limit of desire timeframe
         time = int(str(df_array[i][1])[-2:])
         if time % interval == 0:
             # update row correspond to timeframe, row that divisible to timeframe's interval
-            df.iat[i, 3] = highest
-            df.iat[i, 4] = lowest
-            df.iat[i, 2] = df.iat[start, 2]
+            df.iat[i, high] = highest
+            df.iat[i, low] = lowest
+            df.iat[i, open] = df.iat[start, open]
             # reset variables
             j = 0
             highest = -10
@@ -268,7 +249,7 @@ def split_dataset(input_file_path, split_ratio=0.8, train_file_name=None, test_f
     print("split dataset complete!")
 
 
-def heikin_ashi_candle(input_file_path, output_file_path=None):
+def insert_heikin_ashi_candle_feature(input_file_path, output_file_path=None):
     """
     Add heikin ashi candle features to input file
     :param input_file_path: (Str) relative path leads to input data file
@@ -328,7 +309,7 @@ def plot_data(input_file_path):
 def plot_metrics(metric):
     """
     Plot the metrics to evaluate agent's performance after training, testing
-    And write the result to ./logs/metrics.txt
+    And write the result to ../logs/metrics.txt
     :param metric: Dictionary contains information about agent trading hisotry
     :return: None
     """
@@ -378,8 +359,6 @@ def plot_metrics(metric):
         f.write("{:<25s}{:>5.2f}\n".format("Lowest net worth:", metric.lowest_net_worth))
         f.write("{:<25s}{:>5.2f}\n".format("Win ratio:", metric.win_trades / (metric.win_trades + 1 + metric.lose_trades)))
         f.write("-" * 80 + "\n")
-
-
 
 
 def encode_time(input_file_path, output_file_path=None):
@@ -435,10 +414,11 @@ def standardize_data(df, method='log_and_diff'):
     return df
 
 
-def get_episode(df):
+def get_episode(df_m15, df_h1):
     """
     get indices of episode in data frame, each episode is one week data
-    :param df: (Dataframe) input data to be processed
+    :param df_h1: (Dataframe) input data to be processed, timeframe: 1 hour
+    :param df_m15: (Dataframe) input data to be processed, timeframe: 15 mins
     :return: (Array of Int) indices of time step where trading start (usually start of the week)
     """
     def get_end_week_indices(row):
@@ -448,20 +428,50 @@ def get_episode(df):
             return row.name
         return -1
 
-    indices = df.apply(lambda x: get_end_week_indices(x), axis=1)
+    indices = df_m15.apply(lambda x: get_end_week_indices(x), axis=1)
     indices = indices[indices != -1].to_numpy()
-    true_indices = [(0, indices[0])]
 
     # append start week index to make a list of tuple contains (start, end) indices
+    episode_indices = [(0, indices[0])]
     for i in range(1, len(indices)):
-        true_indices.append((indices[i-1] + 1, indices[i]))
+        episode_indices.append((indices[i-1] + 1, indices[i]))
 
-    return true_indices
+    # get h1 indices
+    h1_indices = []
+    i = 0
+    for index_tuple in episode_indices:
+        start_index = index_tuple[0] + WINDOW_SIZE
+        # update start_index, makes it point to start of hour and new index must <= old start_index
+        # because if index is greater than it's old value, it is future data
+        for k in range(4):
+            hour = df_m15.Time[start_index - k]
+            if hour[-2:] == "00":
+                start_index = start_index - k
+                break
+        # loop over data in hour frame to get corresponding index to start_index in 15 mins time frame data
+        for _ in range(i, len(df_h1)):
+            # compare values that is combined from day and hour to find exact index we want
+            day = df_h1.DayOfYear[i]
+            hour = df_h1.Time[i]
+            full_day_time_h1 = day + ":" + hour
+
+            day = df_m15.DayOfYear[start_index]
+            hour = df_m15.Time[start_index]
+            full_day_time_m15 = day + ":" + hour
+
+            # append whatever index we found that match our condition
+            if full_day_time_h1 == full_day_time_m15:
+                h1_indices.append(i)
+                break
+            else:
+                i += 1
+
+    return episode_indices, h1_indices
 
 
 def augmented_dickey_fuller_test(input_file_path):
     """
-    perfrom ADF test to ensure data has the properies we want
+    perfrom ADF test to ensure data has the properties we want
     :param input_file_path: (Str) relative path leads to input data file
     :return: None
     """
@@ -522,6 +532,7 @@ def insert_economical_news_feature(input_file_path, html_file_path, output_file_
 def show_candles_chart(input_file_path, start, period=100, candle_type="normal"):
     """
     show OHLC price in candle shape
+    :param candle_type: (string) specify candle type: "normal" or "heiken"
     :param input_file_path: (string) relative file path leads to data file
     :param start: (int) index of specific point in time we want to show
     :param period: (int) we normally want to see candles from start to start + period of time
@@ -558,7 +569,7 @@ def data_exploration(input_file_path):
     print(price_diff.quantile([0.3, 0.6]))
 
 
-def categorize_data(input_file_path, output_file_path=None):
+def categorize_price_data(input_file_path, output_file_path=None):
     """
     categorize price to 7 types: side way, small up, medium up, big up, small down, medium down, big down
     NOTE: we could add more type to make our data representation more precise
@@ -659,12 +670,12 @@ def add_embedded_feature_to_dataset(input_csv_file, input_weights_file=EMBEDDED_
     save_file(df, input_csv_file)
 
 
-
 if __name__ == '__main__':
     # data_exploration(TRAIN_FILE)
     #
     # convert_txt_to_csv(RAW_TXT_FILE, RAW_CSV_FILE)
-    # reduce_to_time_frame(RAW_CSV_FILE, 'm15', FULL_DATA_FILE_m15)
+    # reduce_to_time_frame(TRAIN_FILE_m15, 'h1', TRAIN_FILE_h1)
+    # reduce_to_time_frame(TEST_FILE_m15, 'h1', TEST_FILE_h1)
     #
     # plot_data(TRAIN_FILE)
     # metrics = {"num_step": np.linspace(1, 10),
@@ -682,16 +693,17 @@ if __name__ == '__main__':
     #
     # augmented_dickey_fuller_test(TRAIN_FILE)
     # insert_economical_news_feature(FULL_DATA_FILE_m15, "./data/Economic Calendar - Investing.com.html")
-    # heikin_ashi_candle(FULL_DATA_FILE_m15)
+    # insert_heikin_ashi_candle_feature(TRAIN_FILE_h1)
+    # insert_heikin_ashi_candle_feature(TEST_FILE_h1)
     #
-    # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type='normal')
-    # show_candles_chart(TRAIN_FILE, 16000, 150, candle_type="heikin")
+    show_candles_chart(TRAIN_FILE_m15, 16000, 150, candle_type='heikin')
+    show_candles_chart(TRAIN_FILE_h1, 4000, 150//4, candle_type="heikin")
 
-    # categorize_data(FULL_DATA_FILE_m15)
+    # categorize_price_data(FULL_DATA_FILE_m15)
     # embedding_feature(FULL_DATA_FILE_m15)
     # visualize_embedding()
-    add_embedded_feature_to_dataset(FULL_DATA_FILE_m15)
-    split_dataset(FULL_DATA_FILE_m15, split_ratio=0.9)
+    # add_embedded_feature_to_dataset(FULL_DATA_FILE_m15)
+    # split_dataset(FULL_DATA_FILE_m15, split_ratio=0.9)
 
     pass
 

@@ -1,5 +1,29 @@
+import pandas as pd
+import numpy as np
 
 
+if __name__ == "__main__":
+    a = "12345"
+    print(a[-2:])
+    # df_h1 = pd.read_csv("../data/EURUSD_h1_train.csv", sep=",", index_col=0)
+    # df_m15 = pd.read_csv("../data/EURUSD_m15_train.csv", sep=",", index_col=0)
+    #
+    # j = 0
+    # i = 0
+    # for _ in range(0, len(df_m15) // 4):
+    #     day_of_year_m15 = df_m15.DayOfYear[i]
+    #     time_m15 = df_m15.Time[i]
+    #     full_time_m15 = day_of_year_m15 + ":" + time_m15
+    #
+    #     day_of_year_h1 = df_h1.DayOfYear[j]
+    #     time_h1 = df_h1.Time[j]
+    #     full_time_h1 = day_of_year_h1 + ":" + time_h1
+    #
+    #     if full_time_h1 != full_time_m15:
+    #         print("something went wrong at index: i = {}, j = {}".format(i, j))
+    #         break
+    #     i += 4
+    #     j += 1
 
 
 

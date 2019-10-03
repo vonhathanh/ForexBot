@@ -10,7 +10,7 @@ class CustomLSTMPolicy(MlpLstmPolicy):
             n_env,
             n_steps,
             n_batch,
-            n_lstm=64,
+            n_lstm=128,
             reuse=False,
             **_kwargs):
         super(

@@ -5,51 +5,16 @@ from trading_graph import StockTradingGraph
 from gym import spaces
 from util import standardize_data, get_episode
 from metrics import Metric
-
-# a trading session is a fragment of training data
-# when we've finished training agent in a session, we move on to another one (different fragment)
-# this variable determined maximum time allowed in a session
-MAX_TRADING_SESSION = 2000
-
-# 1 lot in forex equal to 100000 usd
-LOT_SIZE = 100000
-
-# amount when buy, sell
-AMOUNT = 0.5
-
-# look back window, agent will use this to know what happended in the past 8 time frame
-WINDOW_SIZE = 48
-
-# comission when we making a trade
-COMISSION = 0.0002
-
-INITIAL_BALANCE = 100000
-
-# this constant is used to normalize agent's balance to range [-1, 1]
-# currently we don't have a more sophisticated method to do that so we just stick with this one
-BALANCE_NORM_FACTOR = 500000
-# action enum, openai gym don't accept enum class so we just use constants here
-HOLD = 0
-BUY = 1
-SELL = 2
-CLOSE = 3
-CLOSE_AND_BUY = 4
-CLOSE_AND_SELL = 5
-
-ACTIONS = {HOLD: "hold",
-           BUY: "buy",
-           SELL: "sell",
-           CLOSE: "close",
-           CLOSE_AND_BUY: "close_and_buy",
-           CLOSE_AND_SELL: "close_and_sell"}
+from constants import *
 
 
 # env that use lstm architecture to train the model
 class LSTM_Env(gym.Env):
 
-    def __init__(self, df,
+    def __init__(self, df_m15, df_h1,
                  serial=False):
-        self.df = standardize_data(df, method="log_and_diff").dropna().reset_index(drop=True)
+        self.df_m15 = standardize_data(df_m15, method="log_and_diff").dropna().reset_index(drop=True)
+        self.df_h1 = df_h1
         self.net_worth = INITIAL_BALANCE
         self.prev_net_worth = INITIAL_BALANCE
         self.usd_held = INITIAL_BALANCE
@@ -60,17 +25,17 @@ class LSTM_Env(gym.Env):
         # trade history
         self.trades = []
         # our profit in last 5 trades
-        self.returns = np.zeros((10))
+        self.returns = np.zeros(10)
 
-        # index of episodes ( 1 episode equivalent to 1 week of trading)
-        self.episode_indices = get_episode(self.df)
+        # index of episodes (1 episode equivalent to 1 week of trading)
+        self.episode_indices_m15, self.h1_indices = get_episode(self.df_m15, self.df_h1)
         self.action_space = spaces.Discrete(6)
         # observation space, includes: OLHC prices (normalized), close price (unnormalized),
         # time in minutes(encoded), day of week(encoded), action history, net worth changes history
         # both minutes, days feature are encoded using sin and cos function to retain circularity
         self.observation_space = spaces.Box(low=-10,
                                             high=10,
-                                            shape=(10, WINDOW_SIZE + 1),
+                                            shape=(12, WINDOW_SIZE + 1),
                                             dtype=np.float16)
         self.metrics = Metric(INITIAL_BALANCE)
         self.setup_active_df()
@@ -104,22 +69,22 @@ class LSTM_Env(gym.Env):
         # if serial mode is enabled, we traverse through training data from 2012->2019
         # else we'll just jumping randomly betweek these times
         if self.serial:
-            self.steps_left = len(self.df) - WINDOW_SIZE - 1
+            self.steps_left = len(self.df_m15) - WINDOW_SIZE - 1
             self.frame_start = 0
         else:
             # pick random episode index from our db
             episode_index = np.random.randint(0, self.metrics.current_epoch * 8)
             # check if we have reached the end of dataset
             # and reroll the invalid index
-            if episode_index >= len(self.episode_indices):
-                episode_index = np.random.randint(0, len(self.episode_indices))
+            if episode_index >= len(self.episode_indices_m15):
+                episode_index = np.random.randint(0, len(self.episode_indices_m15))
 
-            (start_episode, end_episode) = self.episode_indices[episode_index]
+            (start_episode, end_episode) = self.episode_indices_m15[episode_index]
             self.steps_left = end_episode - start_episode - WINDOW_SIZE
             self.frame_start = start_episode
 
-        self.active_df = self.df[self.frame_start: self.frame_start +
-                                 self.steps_left + WINDOW_SIZE + 1]
+        self.active_df = self.df_m15[self.frame_start: self.frame_start +
+                                                       self.steps_left + WINDOW_SIZE + 1]
 
     def reset_variables(self):
         """
@@ -132,7 +97,7 @@ class LSTM_Env(gym.Env):
         self.usd_held = INITIAL_BALANCE
         self.eur_held = 0
         self.trades = []
-        self.returns = np.zeros((10))
+        self.returns = np.zeros(10)
         self.agent_history = {"actions": np.zeros(len(self.active_df) + WINDOW_SIZE),
                               "net_worth": np.zeros(len(self.active_df) + WINDOW_SIZE),
                               "eur_held": np.zeros(len(self.active_df) + WINDOW_SIZE),
@@ -155,13 +120,13 @@ class LSTM_Env(gym.Env):
         self.reward = 0
         profit = self.net_worth - self.prev_net_worth
         if profit > 0:
-            self.reward += 0.2
+            self.reward += 0.3
         elif profit < 0:
-            self.reward -= 0.2
-        if np.mean(self.returns) > 0:
-            self.reward += 0.4
-        elif np.mean(self.returns) < 0:
-            self.reward -= 0.4
+            self.reward -= 0.1
+        # if np.mean(self.returns) > 0:
+        #     self.reward += 0.5
+        # elif np.mean(self.returns) < 0:
+        #     self.reward -= 0.4
 
         # wining_trade_count = np.sum(self.returns > 0)
         # losing_trade_count = np.sum(self.returns < 0)
@@ -338,7 +303,7 @@ class LSTM_Env(gym.Env):
             # init graph
             if not hasattr(self, 'visualization'):
                 self.visualization = StockTradingGraph(
-                    self.df, "Reward visualization")
+                    self.df_m15, "Reward visualization")
             # render it if we have enough information
             if self.current_step > WINDOW_SIZE and mode == 'human':
                 self.visualization.render(
